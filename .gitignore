@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local configuration and secrets
+.env
+
+# Runtime database
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# macOS
+.DS_Store
