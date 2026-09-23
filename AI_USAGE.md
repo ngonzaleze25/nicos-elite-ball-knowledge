@@ -1,0 +1,5 @@
+# AI Usage Log
+
+| Date/commit | Tool | Prompt | Disposition (Accepted/Modified/Rejected) | What changed & why (if modified) | In my own words, how this works |
+|---|---|---|---|---|---|
+| 2026-09-23 / 7730726 | ChatGPT (Codex) | Help me plan a LaLiga betting decision and bankroll application using Flask and SQLite, research Poisson and Kelly calculations, and guide me through the initial Git and GitHub setup. | Modified | I limited the application to LaLiga 2026-27, kept bet365 and bwin odds manual, added quarter Kelly as an optional calculation, and selected Flask instead of a larger framework. | There is no application code yet. Flask will make my Python project into a web app: it receives requests from the browser and sends back pages or data while connecting the screen to the calculations and stored information. |
