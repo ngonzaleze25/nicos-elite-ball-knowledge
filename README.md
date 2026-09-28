@@ -54,7 +54,7 @@ Both domains will run inside one application but remain logically separated so t
 - SQLite persistence for both domains
 - One dependency manifest at the repository root
 - Configuration through environment variables
-- Spanish user interface
+- English user interface
 - LaLiga 2026-27 only
 - Manual odds from bet365 and bwin only
 - User-triggered match-data synchronisation

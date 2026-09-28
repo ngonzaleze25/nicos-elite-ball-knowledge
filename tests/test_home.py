@@ -1,7 +1,7 @@
 from app import create_app
 
 
-def test_home_page_loads_spanish_landing():
+def test_home_page_loads_english_landing():
     app = create_app()
     client = app.test_client()
 
@@ -11,4 +11,4 @@ def test_home_page_loads_spanish_landing():
     page = response.get_data(as_text=True)
     assert "Nico's Elite Ball Knowledge" in page
     assert "LaLiga 2026-27" in page
-    assert "la aplicación se ha iniciado correctamente" in page
+    assert "the application started successfully" in page
