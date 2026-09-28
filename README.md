@@ -64,3 +64,17 @@ Both domains will run inside one application but remain logically separated so t
 - No paid shot-level xG data
 - No accumulators or portfolio Kelly calculations
 - No Dockerfile or CI workflow in this assignment
+
+## Testing
+
+Run the automated tests with coverage:
+
+```bash
+python -m pytest --cov=app --cov=bankroll --cov-report=term-missing
+```
+
+Latest verified result on 2026-09-28:
+
+- 11 tests passed
+- 90% total coverage
+- 100% coverage for `bankroll/kelly.py`
