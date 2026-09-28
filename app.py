@@ -1,10 +1,27 @@
 import os
 
+from database import init_app, init_db
 from flask import Flask, render_template
 
 
 def create_app():
     app = Flask(__name__)
+
+    data_dir = os.environ.get(
+        "DATA_DIR",
+        os.path.join(app.root_path, "data"),
+    )
+    os.makedirs(data_dir, exist_ok=True)
+
+    app.config["DATA_DIR"] = data_dir
+    app.config["DATABASE"] = os.path.join(
+        data_dir,
+        "betledger.sqlite3",
+    )
+
+    init_app(app)
+    with app.app_context():
+        init_db()
 
     @app.get("/")
     def home():
