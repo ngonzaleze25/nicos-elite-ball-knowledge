@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Matches - Nico's Elite Ball Knowledge</title>
+</head>
+<body>
+    <main>
+        <p><a href="{{ url_for('home') }}">Home</a></p>
+        <h1>Matches</h1>
+        <p>Record LaLiga fixtures and manual bet365 / bwin 1X2 odds.</p>
+
+        {% if error %}
+        <p role="alert">{{ error }}</p>
+        {% endif %}
+
+        <h2>Add match</h2>
+        <form action="{{ url_for('add_match') }}" method="post">
+            <label for="home_team">Home team</label>
+            <input id="home_team" name="home_team" type="text" required>
+            <label for="away_team">Away team</label>
+            <input id="away_team" name="away_team" type="text" required>
+            <label for="kickoff_at">Kickoff (ISO datetime)</label>
+            <input id="kickoff_at" name="kickoff_at" type="text" placeholder="2026-10-03T20:00:00" required>
+            <button type="submit">Add match</button>
+        </form>
+
+        <h2>Scheduled and finished matches</h2>
+        {% if not matches %}
+        <p>No matches recorded yet.</p>
+        {% endif %}
+        {% for match in matches %}
+        <section>
+            <h3>{{ match.home_team }} vs {{ match.away_team }}</h3>
+            <p>Kickoff: {{ match.kickoff_at }} · Status: {{ match.status }}</p>
+
+            {% set odds_rows = odds_by_match.get(match.id, []) %}
+            {% if odds_rows %}
+            <ul>
+                {% for odds in odds_rows %}
+                <li>
+                    {{ odds.bookmaker }}:
+                    home {{ odds.home_odds }},
+                    draw {{ odds.draw_odds }},
+                    away {{ odds.away_odds }}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>No odds entered yet.</p>
+            {% endif %}
+
+            <form action="{{ url_for('add_match_odds', match_id=match.id) }}" method="post">
+                <label for="bookmaker-{{ match.id }}">Bookmaker</label>
+                <select id="bookmaker-{{ match.id }}" name="bookmaker" required>
+                    <option value="bet365">bet365</option>
+                    <option value="bwin">bwin</option>
+                </select>
+                <label for="home_odds-{{ match.id }}">Home odds</label>
+                <input id="home_odds-{{ match.id }}" name="home_odds" type="number" min="1.01" step="0.01" required>
+                <label for="draw_odds-{{ match.id }}">Draw odds</label>
+                <input id="draw_odds-{{ match.id }}" name="draw_odds" type="number" min="1.01" step="0.01" required>
+                <label for="away_odds-{{ match.id }}">Away odds</label>
+                <input id="away_odds-{{ match.id }}" name="away_odds" type="number" min="1.01" step="0.01" required>
+                <button type="submit">Save odds</button>
+            </form>
+        </section>
+        {% endfor %}
+    </main>
+</body>
+</html>

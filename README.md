@@ -70,11 +70,13 @@ Both domains will run inside one application but remain logically separated so t
 Run the automated tests with coverage:
 
 ```bash
-python -m pytest --cov=app --cov=bankroll --cov=database --cov-report=term-missing
+python -m pytest --cov=app --cov=bankroll --cov=database --cov=journal --cov-report=term-missing
 ```
 
 Latest verified result on 2026-09-29:
 
-- 19 tests passed
-- 96% total coverage
+- 36 tests passed
+- 95% total coverage
 - 100% coverage for `bankroll/kelly.py`, `bankroll/ledger.py`, and `database.py`
+
+

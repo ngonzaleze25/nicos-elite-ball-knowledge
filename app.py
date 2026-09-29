@@ -4,6 +4,12 @@ from decimal import Decimal, InvalidOperation
 from bankroll.ledger import get_balance_cents, record_deposit
 from database import init_app, init_db
 from flask import Flask, redirect, render_template, request, url_for
+from journal.matches import (
+    create_match,
+    list_match_odds,
+    list_matches,
+    record_match_odds,
+)
 
 
 def create_app():
@@ -50,6 +56,61 @@ def create_app():
             ), 400
 
         return redirect(url_for("home"))
+
+    def _matches_page(error=None, status_code=200):
+        matches = list_matches()
+        odds_by_match = {
+            match["id"]: list_match_odds(match["id"])
+            for match in matches
+        }
+        return render_template(
+            "matches.html",
+            matches=matches,
+            odds_by_match=odds_by_match,
+            error=error,
+        ), status_code
+
+    @app.get("/matches")
+    def matches_page():
+        return _matches_page()
+
+    @app.post("/matches")
+    def add_match():
+        home_team = request.form.get("home_team", "").strip()
+        away_team = request.form.get("away_team", "").strip()
+        kickoff_at = request.form.get("kickoff_at", "").strip()
+
+        try:
+            create_match(home_team, away_team, kickoff_at)
+        except ValueError:
+            return _matches_page(
+                error="Enter home team, away team, and kickoff time.",
+                status_code=400,
+            )
+
+        return redirect(url_for("matches_page"))
+
+    @app.post("/matches/<int:match_id>/odds")
+    def add_match_odds(match_id):
+        bookmaker = request.form.get("bookmaker", "").strip()
+        try:
+            home_odds = float(request.form.get("home_odds", "").strip())
+            draw_odds = float(request.form.get("draw_odds", "").strip())
+            away_odds = float(request.form.get("away_odds", "").strip())
+            record_match_odds(
+                match_id,
+                bookmaker,
+                home_odds,
+                draw_odds,
+                away_odds,
+            )
+        except (TypeError, ValueError):
+            return _matches_page(
+                error="Enter valid bet365 or bwin odds greater than 1.",
+                status_code=400,
+            )
+
+        return redirect(url_for("matches_page"))
 
     return app
 

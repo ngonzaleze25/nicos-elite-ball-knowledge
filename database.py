@@ -13,10 +13,15 @@ def get_db():
 
 def init_db():
     db = get_db()
-    schema_path = Path(current_app.root_path) / "bankroll" / "schema.sql"
+    root = Path(current_app.root_path)
 
-    with schema_path.open(encoding="utf-8") as schema_file:
-        db.executescript(schema_file.read())
+    for relative_path in (
+        Path("bankroll") / "schema.sql",
+        Path("journal") / "schema.sql",
+    ):
+        schema_path = root / relative_path
+        with schema_path.open(encoding="utf-8") as schema_file:
+            db.executescript(schema_file.read())
 
 def close_db(error=None):
     db = g.pop("db", None)
