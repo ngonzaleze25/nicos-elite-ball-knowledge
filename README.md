@@ -73,8 +73,8 @@ Run the automated tests with coverage:
 python -m pytest --cov=app --cov=bankroll --cov=database --cov-report=term-missing
 ```
 
-Latest verified result on 2026-09-28:
+Latest verified result on 2026-09-29:
 
-- 12 tests passed
-- 95% total coverage
-- 100% coverage for `bankroll/kelly.py` and `database.py`
+- 19 tests passed
+- 96% total coverage
+- 100% coverage for `bankroll/kelly.py`, `bankroll/ledger.py`, and `database.py`

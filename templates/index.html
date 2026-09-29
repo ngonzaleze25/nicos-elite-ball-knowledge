@@ -10,6 +10,19 @@
         <h1>Nico's Elite Ball Knowledge</h1>
         <p>Analyze your LaLiga 2026-27 betting decisions.</p>
         <p>Status: the application started successfully.</p>
+
+        <h2>Bankroll</h2>
+        <p>Current balance: €{{ "%.2f"|format(balance_euros) }}</p>
+        {% if error %}
+        <p role="alert">{{ error }}</p>
+        {% endif %}
+        <form action="{{ url_for('add_deposit') }}" method="post">
+            <label for="amount_euros">Deposit amount (€)</label>
+            <input id="amount_euros" name="amount_euros" type="number" min="0.01" step="0.01" required>
+            <label for="description">Description</label>
+            <input id="description" name="description" type="text" required>
+            <button type="submit">Record deposit</button>
+        </form>
     </main>
 </body>
 </html>

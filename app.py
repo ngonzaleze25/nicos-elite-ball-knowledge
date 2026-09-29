@@ -1,7 +1,9 @@
 import os
+from decimal import Decimal, InvalidOperation
 
+from bankroll.ledger import get_balance_cents, record_deposit
 from database import init_app, init_db
-from flask import Flask, render_template
+from flask import Flask, redirect, render_template, request, url_for
 
 
 def create_app():
@@ -25,7 +27,29 @@ def create_app():
 
     @app.get("/")
     def home():
-        return render_template("index.html")
+        balance_euros = Decimal(get_balance_cents()) / 100
+        return render_template("index.html", balance_euros=balance_euros)
+
+    @app.post("/deposits")
+    def add_deposit():
+        amount_text = request.form.get("amount_euros", "").strip()
+        description = request.form.get("description", "").strip()
+
+        try:
+            amount_euros = Decimal(amount_text)
+            amount_cents = amount_euros * 100
+            if not amount_euros.is_finite() or amount_cents != amount_cents.to_integral_value():
+                raise ValueError("Enter a positive euro amount with at most two decimal places.")
+            record_deposit(int(amount_cents), description)
+        except (InvalidOperation, ValueError):
+            balance_euros = Decimal(get_balance_cents()) / 100
+            return render_template(
+                "index.html",
+                balance_euros=balance_euros,
+                error="Enter a positive euro amount with at most two decimal places and a description.",
+            ), 400
+
+        return redirect(url_for("home"))
 
     return app
 
