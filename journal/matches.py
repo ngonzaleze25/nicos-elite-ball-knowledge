@@ -87,3 +87,25 @@ def list_match_odds(match_id):
         """,
         (match_id,),
     ).fetchall()
+
+def record_match_result(match_id, home_goals, away_goals):
+    if not isinstance(match_id, int) or isinstance(match_id, bool) or match_id <= 0:
+        raise ValueError("Match id must be a positive integer.")
+
+    for goals in (home_goals, away_goals):
+        if not isinstance(goals, int) or isinstance(goals, bool) or goals < 0:
+            raise ValueError("Goals must be non-negative integers.")
+
+    db = get_db()
+    cursor = db.execute(
+        """
+        UPDATE matches
+        SET home_goals = ?, away_goals = ?, status = 'finished'
+        WHERE id = ?
+        """,
+        (home_goals, away_goals, match_id),
+    )
+    if cursor.rowcount == 0:
+        raise ValueError("Match does not exist.")
+
+    db.commit()

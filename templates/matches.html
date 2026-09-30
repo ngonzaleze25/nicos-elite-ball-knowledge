@@ -15,14 +15,31 @@
         <p role="alert">{{ error }}</p>
         {% endif %}
 
+        <h2>Decimal odds to probability</h2>
+        <form action="{{ url_for('matches_page') }}" method="get">
+            <label for="decimal_odds">Decimal odds</label>
+            <input id="decimal_odds" name="decimal_odds" type="number"
+                   min="1.01" step="any" value="{{ calculator_odds }}" required>
+            <button type="submit">Convert odds</button>
+        </form>
+
+        {% if calculator_error %}
+        <p role="alert">{{ calculator_error }}</p>
+        {% elif calculator_probability is not none %}
+        <p>Implied probability: {{ "%.2f"|format(calculator_probability) }}%</p>
+        {% endif %}
+
         <h2>Add match</h2>
         <form action="{{ url_for('add_match') }}" method="post">
             <label for="home_team">Home team</label>
             <input id="home_team" name="home_team" type="text" required>
+
             <label for="away_team">Away team</label>
             <input id="away_team" name="away_team" type="text" required>
-            <label for="kickoff_at">Kickoff (ISO datetime)</label>
-            <input id="kickoff_at" name="kickoff_at" type="text" placeholder="2026-10-03T20:00:00" required>
+
+            <label for="kickoff_at">Kickoff date and time</label>
+            <input id="kickoff_at" name="kickoff_at" type="datetime-local" required>
+
             <button type="submit">Add match</button>
         </form>
 
@@ -30,10 +47,31 @@
         {% if not matches %}
         <p>No matches recorded yet.</p>
         {% endif %}
+
         {% for match in matches %}
         <section>
             <h3>{{ match.home_team }} vs {{ match.away_team }}</h3>
             <p>Kickoff: {{ match.kickoff_at }} · Status: {{ match.status }}</p>
+
+            {% if match.status == "finished" %}
+            <p>Final score: {{ match.home_goals }}–{{ match.away_goals }}</p>
+            {% endif %}
+
+            <form action="{{ url_for('add_match_result', match_id=match.id) }}" method="post">
+                <label for="home_goals-{{ match.id }}">Home goals</label>
+                <input id="home_goals-{{ match.id }}" name="home_goals"
+                       type="number" min="0" step="1"
+                       value="{{ match.home_goals if match.home_goals is not none else '' }}"
+                       required>
+
+                <label for="away_goals-{{ match.id }}">Away goals</label>
+                <input id="away_goals-{{ match.id }}" name="away_goals"
+                       type="number" min="0" step="1"
+                       value="{{ match.away_goals if match.away_goals is not none else '' }}"
+                       required>
+
+                <button type="submit">Save final score</button>
+            </form>
 
             {% set odds_rows = odds_by_match.get(match.id, []) %}
             {% if odds_rows %}
@@ -57,12 +95,19 @@
                     <option value="bet365">bet365</option>
                     <option value="bwin">bwin</option>
                 </select>
+
                 <label for="home_odds-{{ match.id }}">Home odds</label>
-                <input id="home_odds-{{ match.id }}" name="home_odds" type="number" min="1.01" step="0.01" required>
+                <input id="home_odds-{{ match.id }}" name="home_odds"
+                       type="number" min="1.01" step="0.01" required>
+
                 <label for="draw_odds-{{ match.id }}">Draw odds</label>
-                <input id="draw_odds-{{ match.id }}" name="draw_odds" type="number" min="1.01" step="0.01" required>
+                <input id="draw_odds-{{ match.id }}" name="draw_odds"
+                       type="number" min="1.01" step="0.01" required>
+
                 <label for="away_odds-{{ match.id }}">Away odds</label>
-                <input id="away_odds-{{ match.id }}" name="away_odds" type="number" min="1.01" step="0.01" required>
+                <input id="away_odds-{{ match.id }}" name="away_odds"
+                       type="number" min="1.01" step="0.01" required>
+
                 <button type="submit">Save odds</button>
             </form>
         </section>

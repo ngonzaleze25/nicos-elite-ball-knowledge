@@ -9,7 +9,9 @@ from journal.matches import (
     list_match_odds,
     list_matches,
     record_match_odds,
+    record_match_result,
 )
+from journal.odds import implied_probability
 
 
 def create_app():
@@ -58,16 +60,31 @@ def create_app():
         return redirect(url_for("home"))
 
     def _matches_page(error=None, status_code=200):
+        odds_input = request.args.get("decimal_odds", "").strip()
+        calculator_probability = None
+        calculator_error = None
+
+        if "decimal_odds" in request.args:
+            try:
+                calculator_probability = implied_probability(float(odds_input))
+            except ValueError:
+                calculator_error = "Enter decimal odds greater than 1."
+                status_code = 400
+
         matches = list_matches()
         odds_by_match = {
             match["id"]: list_match_odds(match["id"])
             for match in matches
         }
+
         return render_template(
             "matches.html",
             matches=matches,
             odds_by_match=odds_by_match,
             error=error,
+            calculator_odds=odds_input,
+            calculator_probability=calculator_probability,
+            calculator_error=calculator_error,
         ), status_code
 
     @app.get("/matches")
@@ -107,6 +124,20 @@ def create_app():
         except (TypeError, ValueError):
             return _matches_page(
                 error="Enter valid bet365 or bwin odds greater than 1.",
+                status_code=400,
+            )
+
+        return redirect(url_for("matches_page"))
+
+    @app.post("/matches/<int:match_id>/result")
+    def add_match_result(match_id):
+        try:
+            home_goals = int(request.form.get("home_goals", ""))
+            away_goals = int(request.form.get("away_goals", ""))
+            record_match_result(match_id, home_goals, away_goals)
+        except ValueError:
+            return _matches_page(
+                error="Enter non-negative whole-number scores for an existing match.",
                 status_code=400,
             )
 

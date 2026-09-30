@@ -64,3 +64,12 @@ def test_home_page_links_to_matches(tmp_path, monkeypatch):
 
     page = client.get("/").get_data(as_text=True)
     assert 'href="/matches"' in page
+
+def test_matches_page_converts_decimal_odds(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    app = create_app()
+
+    response = app.test_client().get("/matches?decimal_odds=1.30")
+
+    assert response.status_code == 200
+    assert "76.92%" in response.get_data(as_text=True)

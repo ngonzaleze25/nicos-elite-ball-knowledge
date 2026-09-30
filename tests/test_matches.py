@@ -6,6 +6,7 @@ from journal.matches import (
     list_match_odds,
     list_matches,
     record_match_odds,
+    record_match_result,
 )
 
 
@@ -99,3 +100,16 @@ def test_record_match_odds_rejects_invalid_prices(tmp_path, monkeypatch, odds):
         match_id = create_match("Celta", "Mallorca", "2026-10-07T19:00:00")
         with pytest.raises(ValueError):
             record_match_odds(match_id, "bwin", odds, 3.2, 3.4)
+
+def test_record_match_result_marks_match_finished(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    app = create_app()
+
+    with app.app_context():
+        match_id = create_match("Sevilla", "Valencia", "2026-10-04T18:00:00")
+        record_match_result(match_id, 2, 1)
+
+        match = list_matches()[0]
+        assert match["home_goals"] == 2
+        assert match["away_goals"] == 1
+        assert match["status"] == "finished"

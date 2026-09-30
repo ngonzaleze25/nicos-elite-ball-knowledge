@@ -80,3 +80,7 @@ Latest verified result on 2026-09-29:
 - 100% coverage for `bankroll/kelly.py`, `bankroll/ledger.py`, and `database.py`
 
 
+#### Decimal odds converter
+
+The Matches page converts manually entered decimal odds into bookmaker-implied probability using `(1 / decimal odds) × 100`. This is a conversion of the bookmaker’s price, not the application’s own probability estimate or a guarantee of the result.
+
