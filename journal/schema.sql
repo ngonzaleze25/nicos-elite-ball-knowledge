@@ -23,3 +23,24 @@ CREATE TABLE IF NOT EXISTS match_odds (
         CHECK (away_odds > 1),
     UNIQUE (match_id, bookmaker)
 );
+
+CREATE TABLE IF NOT EXISTS bet_decisions (
+    id INTEGER PRIMARY KEY,
+    match_id INTEGER NOT NULL
+        REFERENCES matches(id),
+    bookmaker TEXT NOT NULL
+        CHECK (bookmaker IN ('bet365', 'bwin')),
+    selection TEXT NOT NULL
+        CHECK (selection IN ('home', 'draw', 'away')),
+    model_probability REAL NOT NULL
+        CHECK (model_probability >= 0 AND model_probability <= 1),
+    decimal_odds REAL NOT NULL
+        CHECK (decimal_odds > 1),
+    implied_probability REAL NOT NULL
+        CHECK (implied_probability >= 0 AND implied_probability <= 1),
+    value_margin REAL NOT NULL,
+    recommendation TEXT NOT NULL
+        CHECK (recommendation IN ('possible_value', 'no_value')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (match_id, bookmaker, selection)
+);

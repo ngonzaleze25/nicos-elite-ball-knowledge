@@ -1,6 +1,6 @@
 import os
 from decimal import Decimal, InvalidOperation
-
+from journal.decisions import list_bet_decisions, record_bet_decision
 from bankroll.ledger import get_balance_cents, record_deposit
 from database import init_app, init_db
 from flask import Flask, redirect, render_template, request, url_for
@@ -63,7 +63,7 @@ def create_app():
         odds_input = request.args.get("decimal_odds", "").strip()
         calculator_probability = None
         calculator_error = None
-
+        
         if "decimal_odds" in request.args:
             try:
                 calculator_probability = implied_probability(float(odds_input))
@@ -76,12 +76,17 @@ def create_app():
             match["id"]: list_match_odds(match["id"])
             for match in matches
         }
+        decisions_by_match = {
+            match["id"]: list_bet_decisions(match["id"])
+            for match in matches
+        }
 
         return render_template(
             "matches.html",
             matches=matches,
             odds_by_match=odds_by_match,
             error=error,
+            decisions_by_match=decisions_by_match,
             calculator_odds=odds_input,
             calculator_probability=calculator_probability,
             calculator_error=calculator_error,
@@ -138,6 +143,30 @@ def create_app():
         except ValueError:
             return _matches_page(
                 error="Enter non-negative whole-number scores for an existing match.",
+                status_code=400,
+            )
+
+        return redirect(url_for("matches_page"))
+
+    @app.post("/matches/<int:match_id>/decisions")
+    def add_bet_decision(match_id):
+        bookmaker = request.form.get("bookmaker", "").strip()
+        selection = request.form.get("selection", "").strip()
+
+        try:
+            model_probability_percent = Decimal(
+                request.form.get("model_probability_percent", "").strip()
+            )
+            model_probability = model_probability_percent / 100
+            record_bet_decision(
+                match_id=match_id,
+                bookmaker=bookmaker,
+                selection=selection,
+                model_probability=float(model_probability),
+            )
+        except (InvalidOperation, ValueError):
+            return _matches_page(
+                error="Enter a valid bookmaker, selection, and model probability from 0 to 100.",
                 status_code=400,
             )
 

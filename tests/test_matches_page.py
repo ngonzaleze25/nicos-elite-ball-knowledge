@@ -1,4 +1,5 @@
 from app import create_app
+from journal.decisions import list_bet_decisions
 from journal.matches import list_match_odds, list_matches
 
 
@@ -73,3 +74,50 @@ def test_matches_page_converts_decimal_odds(tmp_path, monkeypatch):
 
     assert response.status_code == 200
     assert "76.92%" in response.get_data(as_text=True)
+
+
+def test_matches_page_records_bet_decision(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    app = create_app()
+    client = app.test_client()
+
+    client.post(
+        "/matches",
+        data={
+            "home_team": "Real Madrid",
+            "away_team": "Valencia",
+            "kickoff_at": "2026-10-10T20:00",
+        },
+    )
+    client.post(
+        "/matches/1/odds",
+        data={
+            "bookmaker": "bet365",
+            "home_odds": "2.50",
+            "draw_odds": "3.40",
+            "away_odds": "3.10",
+        },
+    )
+
+    response = client.post(
+        "/matches/1/decisions",
+        data={
+            "bookmaker": "bet365",
+            "selection": "home",
+            "model_probability_percent": "50",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "bet365 home:" in body
+    assert "model 50.00%" in body
+    assert "implied 40.00%" in body
+    assert "possible value" in body
+
+    with app.app_context():
+        decisions = list_bet_decisions(1)
+
+    assert len(decisions) == 1
+    assert decisions[0]["recommendation"] == "possible_value"
