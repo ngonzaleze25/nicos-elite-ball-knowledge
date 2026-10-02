@@ -29,3 +29,13 @@ def record_deposit(amount_cents, description):
         ("deposit", amount_cents, description.strip()),
     )
     db.commit()
+
+def list_transactions():
+    """Return bankroll transactions, newest first."""
+    return get_db().execute(
+        """
+        SELECT id, transaction_type, amount_cents, description, created_at
+        FROM bankroll_transactions
+        ORDER BY id DESC
+        """
+    ).fetchall()

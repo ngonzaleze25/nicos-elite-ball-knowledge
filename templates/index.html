@@ -24,6 +24,31 @@
             <input id="description" name="description" type="text" required>
             <button type="submit">Record deposit</button>
         </form>
+                <h2>Transaction history</h2>
+        {% if transactions %}
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for transaction in transactions %}
+                <tr>
+                    <td>{{ transaction["created_at"] }}</td>
+                    <td>{{ transaction["transaction_type"] }}</td>
+                    <td>{{ transaction["description"] }}</td>
+                    <td>€{{ "%.2f"|format(transaction["amount_cents"] / 100) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No transactions yet.</p>
+        {% endif %}
     </main>
 </body>
 </html>

@@ -1,7 +1,11 @@
 import os
 from decimal import Decimal, InvalidOperation
 
-from bankroll.ledger import get_balance_cents, record_deposit
+from bankroll.ledger import (
+    get_balance_cents,
+    list_transactions,
+    record_deposit,
+)
 from database import init_app, init_db
 from flask import Flask, redirect, render_template, request, url_for
 from journal.decisions import (
@@ -44,7 +48,11 @@ def create_app():
     @app.get("/")
     def home():
         balance_euros = Decimal(get_balance_cents()) / 100
-        return render_template("index.html", balance_euros=balance_euros)
+        return render_template(
+            "index.html",
+            balance_euros=balance_euros,
+            transactions=list_transactions(),
+        )
 
     @app.post("/deposits")
     def add_deposit():
@@ -62,6 +70,7 @@ def create_app():
             return render_template(
                 "index.html",
                 balance_euros=balance_euros,
+                transactions=list_transactions(),
                 error="Enter a positive euro amount with at most two decimal places and a description.",
             ), 400
 
