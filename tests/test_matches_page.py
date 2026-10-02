@@ -82,6 +82,10 @@ def test_matches_page_records_bet_decision(tmp_path, monkeypatch):
     client = app.test_client()
 
     client.post(
+        "/deposits",
+        data={"amount_euros": "100.00", "description": "Opening bankroll"},
+    )
+    client.post(
         "/matches",
         data={
             "home_team": "Real Madrid",
@@ -114,6 +118,9 @@ def test_matches_page_records_bet_decision(tmp_path, monkeypatch):
     assert "bet365 home:" in body
     assert "model 50.00%" in body
     assert "implied 40.00%" in body
+    assert "full Kelly €16.67" in body
+    assert "quarter Kelly €4.17" in body
+    assert "suggested stake €4.17" in body
     assert "possible value" in body
 
     with app.app_context():

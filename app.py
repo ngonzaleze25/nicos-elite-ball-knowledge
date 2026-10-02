@@ -1,9 +1,14 @@
 import os
 from decimal import Decimal, InvalidOperation
-from journal.decisions import list_bet_decisions, record_bet_decision
+
 from bankroll.ledger import get_balance_cents, record_deposit
 from database import init_app, init_db
 from flask import Flask, redirect, render_template, request, url_for
+from journal.decisions import (
+    DEFAULT_MAX_STAKE_CENTS,
+    list_bet_decisions,
+    record_bet_decision,
+)
 from journal.matches import (
     create_match,
     list_match_odds,
@@ -27,6 +32,9 @@ def create_app():
     app.config["DATABASE"] = os.path.join(
         data_dir,
         "betledger.sqlite3",
+    )
+    app.config["MAX_STAKE_CENTS"] = int(
+        os.environ.get("MAX_STAKE_CENTS", str(DEFAULT_MAX_STAKE_CENTS))
     )
 
     init_app(app)
@@ -63,7 +71,7 @@ def create_app():
         odds_input = request.args.get("decimal_odds", "").strip()
         calculator_probability = None
         calculator_error = None
-        
+
         if "decimal_odds" in request.args:
             try:
                 calculator_probability = implied_probability(float(odds_input))
@@ -163,6 +171,7 @@ def create_app():
                 bookmaker=bookmaker,
                 selection=selection,
                 model_probability=float(model_probability),
+                max_stake_cents=app.config["MAX_STAKE_CENTS"],
             )
         except (InvalidOperation, ValueError):
             return _matches_page(

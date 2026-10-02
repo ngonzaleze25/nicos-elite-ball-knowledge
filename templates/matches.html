@@ -98,6 +98,9 @@
                     model {{ "%.2f"|format(decision.model_probability * 100) }}%,
                     implied {{ "%.2f"|format(decision.implied_probability * 100) }}%,
                     margin {{ "%.2f"|format(decision.value_margin * 100) }}%,
+                    full Kelly €{{ "%.2f"|format(decision.full_kelly_stake_cents / 100) }},
+                    quarter Kelly €{{ "%.2f"|format(decision.quarter_kelly_stake_cents / 100) }},
+                    suggested stake €{{ "%.2f"|format(decision.recommended_stake_cents / 100) }},
                     {{ decision.recommendation.replace("_", " ") }}
                 </li>
                 {% endfor %}

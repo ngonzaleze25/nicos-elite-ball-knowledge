@@ -41,6 +41,12 @@ CREATE TABLE IF NOT EXISTS bet_decisions (
     value_margin REAL NOT NULL,
     recommendation TEXT NOT NULL
         CHECK (recommendation IN ('possible_value', 'no_value')),
+    full_kelly_stake_cents INTEGER NOT NULL DEFAULT 0
+        CHECK (full_kelly_stake_cents >= 0),
+    quarter_kelly_stake_cents INTEGER NOT NULL DEFAULT 0
+        CHECK (quarter_kelly_stake_cents >= 0),
+    recommended_stake_cents INTEGER NOT NULL DEFAULT 0
+        CHECK (recommended_stake_cents >= 0),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (match_id, bookmaker, selection)
 );

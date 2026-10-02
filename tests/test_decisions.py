@@ -1,6 +1,7 @@
 import pytest
 
 from app import create_app
+from bankroll.ledger import record_deposit
 from journal.decisions import list_bet_decisions, record_bet_decision
 from journal.matches import create_match, record_match_odds
 
@@ -94,3 +95,50 @@ def test_record_bet_decision_rejects_missing_odds(tmp_path, monkeypatch):
                 selection="home",
                 model_probability=0.50,
             )
+
+
+def test_record_bet_decision_caps_quarter_kelly_by_stake_limit(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    app = create_app()
+
+    with app.app_context():
+        record_deposit(10000, "Opening bankroll")
+        match_id = create_match("Real Madrid", "Valencia", "2026-10-10T20:00")
+        record_match_odds(match_id, "bet365", 2.50, 3.40, 3.10)
+
+        record_bet_decision(
+            match_id=match_id,
+            bookmaker="bet365",
+            selection="home",
+            model_probability=0.50,
+            max_stake_cents=1000,
+        )
+
+        decision = list_bet_decisions(match_id)[0]
+
+        assert decision["full_kelly_stake_cents"] == 1667
+        assert decision["quarter_kelly_stake_cents"] == 417
+        assert decision["recommended_stake_cents"] == 417
+
+
+def test_record_bet_decision_never_recommends_more_than_limit(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    app = create_app()
+
+    with app.app_context():
+        record_deposit(10000, "Opening bankroll")
+        match_id = create_match("Atletico", "Villarreal", "2026-10-12T21:00")
+        record_match_odds(match_id, "bet365", 5.00, 3.25, 1.80)
+
+        record_bet_decision(
+            match_id=match_id,
+            bookmaker="bet365",
+            selection="home",
+            model_probability=0.60,
+            max_stake_cents=1000,
+        )
+
+        decision = list_bet_decisions(match_id)[0]
+
+        assert decision["quarter_kelly_stake_cents"] > 1000
+        assert decision["recommended_stake_cents"] == 1000

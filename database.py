@@ -11,6 +11,7 @@ def get_db():
 
     return g.db
 
+
 def init_db():
     db = get_db()
     root = Path(current_app.root_path)
@@ -22,6 +23,36 @@ def init_db():
         schema_path = root / relative_path
         with schema_path.open(encoding="utf-8") as schema_file:
             db.executescript(schema_file.read())
+
+    _ensure_bet_decision_stake_columns(db)
+
+
+def _ensure_bet_decision_stake_columns(db):
+    existing_columns = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(bet_decisions)").fetchall()
+    }
+    stake_columns = {
+        "full_kelly_stake_cents": (
+            "INTEGER NOT NULL DEFAULT 0 "
+            "CHECK (full_kelly_stake_cents >= 0)"
+        ),
+        "quarter_kelly_stake_cents": (
+            "INTEGER NOT NULL DEFAULT 0 "
+            "CHECK (quarter_kelly_stake_cents >= 0)"
+        ),
+        "recommended_stake_cents": (
+            "INTEGER NOT NULL DEFAULT 0 "
+            "CHECK (recommended_stake_cents >= 0)"
+        ),
+    }
+
+    for column_name, definition in stake_columns.items():
+        if column_name not in existing_columns:
+            db.execute(
+                f"ALTER TABLE bet_decisions ADD COLUMN {column_name} {definition}"
+            )
+
 
 def close_db(error=None):
     db = g.pop("db", None)
