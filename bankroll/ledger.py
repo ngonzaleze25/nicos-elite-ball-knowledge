@@ -40,6 +40,25 @@ def list_transactions():
         """
     ).fetchall()
 
+
+def reset_available_balance():
+    """Withdraw the available balance without deleting bets or ledger history."""
+    db = get_db()
+    with db:
+        db.execute("BEGIN IMMEDIATE")
+        balance = get_balance_cents()
+        if balance <= 0:
+            return 0
+        db.execute(
+            """
+            INSERT INTO bankroll_transactions
+                (transaction_type, amount_cents, description)
+            VALUES ('withdrawal', ?, 'Reset available balance to zero')
+            """,
+            (-balance,),
+        )
+    return balance
+
 def validate_stake(amount_cents, max_stake_cents):
     """Check a requested stake without changing the balance."""
     if (

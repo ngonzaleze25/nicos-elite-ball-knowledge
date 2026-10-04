@@ -33,6 +33,10 @@
             <input id="description" name="description" type="text" required>
             <button type="submit">Record deposit</button>
         </form>
+        <form action="{{ url_for('reset_bankroll') }}" method="post">
+            <button type="submit" {% if balance_euros <= 0 %}disabled{% endif %}>Reset available balance to €0</button>
+        </form>
+        <p class="muted">Records a withdrawal of your available balance. Keeps transaction history and open bets; future payouts or refunds can add money again.</p>
 
         </section>
         <section class="card">

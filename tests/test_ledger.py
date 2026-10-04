@@ -87,3 +87,22 @@ def test_validate_stake_rejects_invalid_requests(
             validate_stake(amount, limit)
 
         assert get_balance_cents() == 10000
+
+def test_reset_balance_is_persistent_and_repeated_reset_is_noop(tmp_path, monkeypatch):
+    from bankroll.ledger import reset_available_balance
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    app = create_app()
+    with app.app_context():
+        record_deposit(5000, "Test deposit")
+        assert reset_available_balance() == 5000
+        assert get_balance_cents() == 0
+        assert reset_available_balance() == 0
+        rows = get_db().execute(
+            "SELECT transaction_type, amount_cents FROM bankroll_transactions ORDER BY id"
+        ).fetchall()
+        assert [tuple(row) for row in rows] == [("deposit", 5000), ("withdrawal", -5000)]
+    with create_app().app_context():
+        assert get_balance_cents() == 0
+        record_deposit(2000, "Actual bankroll")
+        assert get_balance_cents() == 2000

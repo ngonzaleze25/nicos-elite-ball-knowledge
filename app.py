@@ -1,4 +1,5 @@
 import os
+from journal.probability import estimate_from_results
 from journal.sync import sync_laliga_matches
 from decimal import Decimal, InvalidOperation
 from journal.bets import list_bets, record_bet, settle_bet
@@ -7,6 +8,7 @@ from bankroll.ledger import (
     get_open_exposure_cents,
     list_transactions,
     record_deposit,
+    reset_available_balance,
 )
 from database import init_app, init_db
 from flask import Flask, redirect, render_template, request, url_for
@@ -57,6 +59,11 @@ def create_app():
                 bets=list_bets(),
                 transactions=list_transactions(),
         )
+
+    @app.post("/bankroll/reset")
+    def reset_bankroll():
+        reset_available_balance()
+        return redirect(url_for("home"))
 
     @app.post("/deposits")
     def add_deposit():
@@ -111,6 +118,16 @@ def create_app():
             match["id"]: list_bet_decisions(match["id"])
             for match in matches
         }
+        estimates_by_match = {}
+        estimate_errors = {}
+
+        for match in matches:
+            try:
+                estimates_by_match[match["id"]] = estimate_from_results(
+                    match["id"]
+                )
+            except ValueError as estimate_error:
+                estimate_errors[match["id"]] = str(estimate_error)
 
         return render_template(
             "matches.html",
@@ -120,10 +137,13 @@ def create_app():
             odds_by_match=odds_by_match,
             error=error,
             message=message,
+            open_match=request.values.get("open_match", ""),
             selected_view=view,
             search=search,
             days=days,
             decisions_by_match=decisions_by_match,
+            estimates_by_match=estimates_by_match,
+            estimate_errors=estimate_errors,
             bets_by_decision={
                 bet["decision_id"]: bet for bet in list_bets()
             },
@@ -137,12 +157,16 @@ def create_app():
         return _matches_page()
 
     def _matches_redirect():
-        return redirect(url_for(
-            "matches_page",
-            view=request.form.get("view", "upcoming"),
-            search=request.form.get("search", ""),
-            days=request.form.get("days", "7"),
-        ))
+        context = {
+            "view": request.form.get("view", "upcoming"),
+            "search": request.form.get("search", ""),
+            "days": request.form.get("days", "7"),
+        }
+        open_match = request.form.get("open_match", "")
+        if open_match.isdecimal():
+            context["open_match"] = open_match
+            context["_anchor"] = f"match-{open_match}"
+        return redirect(url_for("matches_page", **context))
 
     @app.post("/matches")
     def add_match():
@@ -202,25 +226,26 @@ def create_app():
         selection = request.form.get("selection", "").strip()
 
         try:
-            model_probability_percent = Decimal(
-                request.form.get("model_probability_percent", "").strip()
-            )
-            model_probability = model_probability_percent / 100
+            if selection not in ("home", "draw", "away"):
+                raise ValueError("Choose Home, Draw, or Away.")
+
+            estimate = estimate_from_results(match_id)
+            model_probability = estimate["probabilities"][selection]
+
             record_bet_decision(
                 match_id=match_id,
                 bookmaker=bookmaker,
                 selection=selection,
-                model_probability=float(model_probability),
+                model_probability=model_probability,
                 max_stake_cents=app.config["MAX_STAKE_CENTS"],
             )
-        except (InvalidOperation, ValueError):
+        except ValueError as error:
             return _matches_page(
-                error="Enter a valid bookmaker, selection, and model probability from 0 to 100.",
+                error=str(error),
                 status_code=400,
             )
 
         return _matches_redirect()
-
     @app.post("/decisions/<int:decision_id>/bets")
     def add_bet(decision_id):
         try:
@@ -252,6 +277,8 @@ def create_app():
                 status_code=400,
             )
 
+        if "view" in request.form:
+            return _matches_redirect()
         return redirect(url_for("home"))
     @app.post("/bets/<int:bet_id>/settlement")
     def settle_recorded_bet(bet_id):

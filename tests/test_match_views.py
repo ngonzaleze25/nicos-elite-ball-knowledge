@@ -100,7 +100,7 @@ def test_history_is_newest_first_and_imported_results_are_read_only(workspace_ap
     assert [match["id"] for match in list_visible_matches("history")] == [newer, old]
     html = workspace_app.test_client().get("/matches?view=history").get_data(as_text=True)
     assert "Newer vs Visitors" in html
-    assert '<details class="match">' in html
+    assert f'<details class="match" id="match-{newer}">' in html
     assert '<details class="match" open' not in html
     assert f'action="/matches/{newer}/result"' not in html
 
@@ -109,7 +109,7 @@ def test_saving_odds_preserves_view_search_and_window(workspace_app):
     match_id = create_match("Real Madrid", "Visitors", "2026-10-20T20:00")
     response = workspace_app.test_client().post(
         f"/matches/{match_id}/odds",
-        data={"bookmaker": "bet365", "home_odds": "2.5", "draw_odds": "3.4", "away_odds": "3.1", "view": "upcoming", "search": "Madrid", "days": "30"},
+        data={"bookmaker": "bet365", "home_odds": "2.5", "draw_odds": "3.4", "away_odds": "3.1", "view": "upcoming", "search": "Madrid", "days": "30", "open_match": str(match_id)},
         follow_redirects=True,
     )
     assert response.status_code == 200
@@ -118,6 +118,8 @@ def test_saving_odds_preserves_view_search_and_window(workspace_app):
     assert 'value="30" selected' in html
     assert 'name="search" type="search" value="Madrid"' in html
     assert "home 2.5" in html
+    assert f'<details class="match" id="match-{match_id}" open>' in html
+    assert response.history[0].headers["Location"].endswith(f"#match-{match_id}")
 
 
 @pytest.mark.parametrize("kickoff", ["2005-10-25T14:00", "2026-06-30T23:59", "2027-07-01T00:00", "not-a-date", "2026-10-04"])

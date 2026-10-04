@@ -396,3 +396,16 @@ def test_settlement_submission(
     assert (form_action in home.get_data(as_text=True)) == (
         expected_status == "open"
     )
+
+def test_reset_route_keeps_open_bet_and_refund_working(funded_decision):
+    app, decision_id = funded_decision
+    bet_id = record_bet(decision_id, 1000)
+    client = app.test_client()
+    assert client.get("/bankroll/reset").status_code == 405
+    response = client.post("/bankroll/reset", follow_redirects=True)
+    assert response.status_code == 200
+    assert "Current balance: <strong>€0.00</strong>" in response.get_data(as_text=True)
+    assert get_open_exposure_cents() == 1000
+    assert list_bets()[0]["status"] == "open"
+    assert settle_bet(bet_id, void=True) == "void"
+    assert get_balance_cents() == 1000
