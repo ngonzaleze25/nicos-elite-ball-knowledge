@@ -50,3 +50,21 @@ CREATE TABLE IF NOT EXISTS bet_decisions (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (match_id, bookmaker, selection)
 );
+
+CREATE TABLE IF NOT EXISTS bets (
+    id INTEGER PRIMARY KEY,
+    decision_id INTEGER NOT NULL UNIQUE
+        REFERENCES bet_decisions(id),
+    stake_cents INTEGER NOT NULL
+        CHECK (stake_cents > 0),
+    decimal_odds REAL NOT NULL
+        CHECK (decimal_odds > 1),
+    status TEXT NOT NULL DEFAULT 'open'
+        CHECK (status IN ('open', 'won', 'lost', 'void')),
+    stake_transaction_id INTEGER NOT NULL UNIQUE
+        REFERENCES bankroll_transactions(id),
+    settlement_transaction_id INTEGER UNIQUE
+        REFERENCES bankroll_transactions(id),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    settled_at TEXT
+);

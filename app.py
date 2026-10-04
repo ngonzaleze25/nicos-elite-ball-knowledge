@@ -1,8 +1,9 @@
 import os
 from decimal import Decimal, InvalidOperation
-
+from journal.bets import list_bets, record_bet, settle_bet
 from bankroll.ledger import (
     get_balance_cents,
+    get_open_exposure_cents,
     list_transactions,
     record_deposit,
 )
@@ -49,9 +50,11 @@ def create_app():
     def home():
         balance_euros = Decimal(get_balance_cents()) / 100
         return render_template(
-            "index.html",
-            balance_euros=balance_euros,
-            transactions=list_transactions(),
+                "index.html",
+                balance_euros=balance_euros,
+                exposure_euros=Decimal(get_open_exposure_cents()) / 100,
+                bets=list_bets(),
+                transactions=list_transactions(),
         )
 
     @app.post("/deposits")
@@ -70,6 +73,8 @@ def create_app():
             return render_template(
                 "index.html",
                 balance_euros=balance_euros,
+                exposure_euros=Decimal(get_open_exposure_cents() / 100),
+                bets=list_bets(),
                 transactions=list_transactions(),
                 error="Enter a positive euro amount with at most two decimal places and a description.",
             ), 400
@@ -104,6 +109,9 @@ def create_app():
             odds_by_match=odds_by_match,
             error=error,
             decisions_by_match=decisions_by_match,
+            bets_by_decision={
+                bet["decision_id"]: bet for bet in list_bets()
+            },
             calculator_odds=odds_input,
             calculator_probability=calculator_probability,
             calculator_error=calculator_error,
@@ -189,6 +197,59 @@ def create_app():
             )
 
         return redirect(url_for("matches_page"))
+
+    @app.post("/decisions/<int:decision_id>/bets")
+    def add_bet(decision_id):
+        try:
+            stake_euros = Decimal(
+                request.form.get("stake_euros", "").strip()
+            )
+
+            if not stake_euros.is_finite() or stake_euros <= 0:
+                raise ValueError("Enter a positive, finite stake.")
+
+            limit_euros = Decimal(app.config["MAX_STAKE_CENTS"]) / 100
+            if stake_euros > limit_euros:
+                raise ValueError("Stake exceeds the configured limit.")
+
+            stake_cents = stake_euros * 100
+            if stake_cents != stake_cents.to_integral_value():
+                raise ValueError("Use at most two decimal places.")
+
+            record_bet(decision_id, int(stake_cents))
+
+        except InvalidOperation:
+            return _matches_page(
+                error="Enter a valid euro stake.",
+                status_code=400,
+            )
+        except ValueError as error:
+            return _matches_page(
+                error=str(error),
+                status_code=400,
+            )
+
+        return redirect(url_for("home"))
+    @app.post("/bets/<int:bet_id>/settlement")
+    def settle_recorded_bet(bet_id):
+        action = request.form.get("action", "").strip()
+
+        try:
+            if action not in ("settle", "void"):
+                raise ValueError("Choose settlement or a void refund.")
+
+            settle_bet(bet_id, void=(action == "void"))
+        except ValueError as error:
+            return render_template(
+                "index.html",
+                balance_euros=Decimal(get_balance_cents()) / 100,
+                exposure_euros=Decimal(get_open_exposure_cents()) / 100,
+                bets=list_bets(),
+                transactions=list_transactions(),
+                error=str(error),
+            ), 400
+
+        return redirect(url_for("home"))
 
     return app
 

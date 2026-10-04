@@ -19,7 +19,12 @@ def test_database_schema_and_connection_lifecycle(tmp_path, monkeypatch):
 
         assert get_db() is db
 
-        for table_name in ("bankroll_transactions", "matches", "match_odds", "bet_decisions"):
+        for table_name in ("bankroll_transactions", 
+                           "matches",
+                           "match_odds",
+                            "bet_decisions", 
+                            "bets",
+                        ):
             table = db.execute(
                 "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
                 ("table", table_name),

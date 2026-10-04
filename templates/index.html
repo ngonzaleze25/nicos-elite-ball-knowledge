@@ -14,6 +14,8 @@
 
         <h2>Bankroll</h2>
         <p>Current balance: €{{ "%.2f"|format(balance_euros) }}</p>
+        <p>Open exposure: €{{ "%.2f"|format(exposure_euros) }}</p>
+        <p>Open stakes have already been deducted from the current balance.</p>
         {% if error %}
         <p role="alert">{{ error }}</p>
         {% endif %}
@@ -24,7 +26,36 @@
             <input id="description" name="description" type="text" required>
             <button type="submit">Record deposit</button>
         </form>
-                <h2>Transaction history</h2>
+
+        <h2>Recorded bets</h2>
+        {% if bets %}
+        <ul>
+            {% for bet in bets %}
+            <li>
+                {{ bet.home_team }} vs {{ bet.away_team }}:
+                {{ bet.bookmaker }} — {{ bet.selection }},
+                stake €{{ "%.2f"|format(bet.stake_cents / 100) }},
+                odds {{ "%.2f"|format(bet.decimal_odds) }},
+                status: {{ bet.status }}.
+                {% if bet.status == "open" %}
+                <form action="{{ url_for('settle_recorded_bet', bet_id=bet.id) }}"
+                      method="post">
+                    <button type="submit" name="action" value="settle">
+                        Settle from final score
+                    </button>
+                    <button type="submit" name="action" value="void">
+                        Void bet and refund stake
+                    </button>
+                </form>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>No bets recorded yet.</p>
+        {% endif %}
+
+        <h2>Transaction history</h2>
         {% if transactions %}
         <table>
             <thead>
