@@ -4,17 +4,24 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nico's Elite Ball Knowledge</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <main>
         <h1>Nico's Elite Ball Knowledge</h1>
         <p>Analyze your LaLiga 2026-27 betting decisions.</p>
-        <p>Status: the application started successfully.</p>
-        <p><a href="{{ url_for('matches_page') }}">Matches</a></p>
 
+        <nav aria-label="Main navigation">
+            <a href="{{ url_for('home') }}" aria-current="page">Home</a>
+            <a href="{{ url_for('matches_page') }}">Matches</a>
+        </nav>
+
+        <section class="card">
         <h2>Bankroll</h2>
-        <p>Current balance: €{{ "%.2f"|format(balance_euros) }}</p>
-        <p>Open exposure: €{{ "%.2f"|format(exposure_euros) }}</p>
+        <div class="bankroll-summary">
+            <p>Current balance: <strong>€{{ "%.2f"|format(balance_euros) }}</strong></p>
+            <p>Open exposure: <strong>€{{ "%.2f"|format(exposure_euros) }}</strong></p>
+        </div>
         <p>Open stakes have already been deducted from the current balance.</p>
         {% if error %}
         <p role="alert">{{ error }}</p>
@@ -27,9 +34,11 @@
             <button type="submit">Record deposit</button>
         </form>
 
+        </section>
+        <section class="card">
         <h2>Recorded bets</h2>
         {% if bets %}
-        <ul>
+        <ul class="bet-list">
             {% for bet in bets %}
             <li>
                 {{ bet.home_team }} vs {{ bet.away_team }}:
@@ -55,8 +64,11 @@
         <p>No bets recorded yet.</p>
         {% endif %}
 
+        </section>
+        <section class="card">
         <h2>Transaction history</h2>
         {% if transactions %}
+        <div class="table-scroll">
         <table>
             <thead>
                 <tr>
@@ -77,9 +89,11 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
         <p>No transactions yet.</p>
         {% endif %}
+        </section>
     </main>
 </body>
 </html>

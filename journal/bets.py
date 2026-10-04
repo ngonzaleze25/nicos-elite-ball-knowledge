@@ -1,4 +1,5 @@
 import math
+from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from flask import current_app
@@ -23,9 +24,15 @@ def record_bet(decision_id, stake_cents):
 
         decision = db.execute(
             """
-            SELECT d.id, d.decimal_odds, m.status AS match_status
+            SELECT
+                d.id,
+                d.decimal_odds,
+                m.status AS match_status,
+                m.kickoff_at,
+                i.api_status
             FROM bet_decisions AS d
             JOIN matches AS m ON m.id = d.match_id
+            LEFT JOIN match_imports AS i ON i.match_id = m.id
             WHERE d.id = ?
             """,
             (decision_id,),
@@ -36,7 +43,15 @@ def record_bet(decision_id, stake_cents):
 
         if decision["match_status"] != "scheduled":
             raise ValueError("Cannot record a bet on a finished match.")
-
+        
+        if decision["api_status"] is not None:
+            if decision["api_status"] not in ("SCHEDULED", "TIMED"):
+                raise ValueError(
+                    "Cannot record a bet on a live or unavailable fixture."
+                )
+            kickoff = datetime.fromisoformat(decision["kickoff_at"])
+            if kickoff <= datetime.now(timezone.utc):
+                raise ValueError("Cannot record a new stake after kickoff.")
         existing_bet = db.execute(
             "SELECT id FROM bets WHERE decision_id = ?",
             (decision_id,),

@@ -9,14 +9,14 @@ def test_matches_page_adds_match_and_odds(tmp_path, monkeypatch):
     client = app.test_client()
 
     page = client.get("/matches").get_data(as_text=True)
-    assert "No matches recorded yet." in page
+    assert "No matches match these filters." in page
 
     response = client.post(
         "/matches",
         data={
             "home_team": "Real Madrid",
             "away_team": "Barcelona",
-            "kickoff_at": "2026-10-03T20:00:00",
+            "kickoff_at": "2026-10-10T20:00:00",
         },
         follow_redirects=True,
     )
@@ -55,7 +55,7 @@ def test_matches_page_rejects_empty_match(tmp_path, monkeypatch):
         data={"home_team": "", "away_team": "Barcelona", "kickoff_at": "2026-10-03T20:00:00"},
     )
     assert response.status_code == 400
-    assert "Enter home team, away team, and kickoff time." in response.get_data(as_text=True)
+    assert "Home team cannot be empty." in response.get_data(as_text=True)
 
 
 def test_home_page_links_to_matches(tmp_path, monkeypatch):

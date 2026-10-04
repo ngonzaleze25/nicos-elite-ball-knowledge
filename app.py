@@ -1,4 +1,5 @@
 import os
+from journal.sync import sync_laliga_matches
 from decimal import Decimal, InvalidOperation
 from journal.bets import list_bets, record_bet, settle_bet
 from bankroll.ledger import (
@@ -17,7 +18,7 @@ from journal.decisions import (
 from journal.matches import (
     create_match,
     list_match_odds,
-    list_matches,
+    list_visible_matches,
     record_match_odds,
     record_match_result,
 )
@@ -73,7 +74,7 @@ def create_app():
             return render_template(
                 "index.html",
                 balance_euros=balance_euros,
-                exposure_euros=Decimal(get_open_exposure_cents() / 100),
+                exposure_euros=Decimal(get_open_exposure_cents()) / 100,
                 bets=list_bets(),
                 transactions=list_transactions(),
                 error="Enter a positive euro amount with at most two decimal places and a description.",
@@ -81,7 +82,7 @@ def create_app():
 
         return redirect(url_for("home"))
 
-    def _matches_page(error=None, status_code=200):
+    def _matches_page(error=None, status_code=200, message=None):
         odds_input = request.args.get("decimal_odds", "").strip()
         calculator_probability = None
         calculator_error = None
@@ -93,7 +94,15 @@ def create_app():
                 calculator_error = "Enter decimal odds greater than 1."
                 status_code = 400
 
-        matches = list_matches()
+        view = request.values.get("view", "upcoming")
+        search = request.values.get("search", "").strip()
+        try:
+            days = int(request.values.get("days", "7"))
+            matches = list_visible_matches(view, search, days)
+        except ValueError as filter_error:
+            view, days = "upcoming", 7
+            matches = list_visible_matches(view, search, days)
+            error, status_code = str(filter_error), 400
         odds_by_match = {
             match["id"]: list_match_odds(match["id"])
             for match in matches
@@ -105,9 +114,15 @@ def create_app():
 
         return render_template(
             "matches.html",
+            balance_euros=Decimal(get_balance_cents()) / 100,
+            exposure_euros=Decimal(get_open_exposure_cents()) / 100,
             matches=matches,
             odds_by_match=odds_by_match,
             error=error,
+            message=message,
+            selected_view=view,
+            search=search,
+            days=days,
             decisions_by_match=decisions_by_match,
             bets_by_decision={
                 bet["decision_id"]: bet for bet in list_bets()
@@ -121,6 +136,14 @@ def create_app():
     def matches_page():
         return _matches_page()
 
+    def _matches_redirect():
+        return redirect(url_for(
+            "matches_page",
+            view=request.form.get("view", "upcoming"),
+            search=request.form.get("search", ""),
+            days=request.form.get("days", "7"),
+        ))
+
     @app.post("/matches")
     def add_match():
         home_team = request.form.get("home_team", "").strip()
@@ -129,13 +152,13 @@ def create_app():
 
         try:
             create_match(home_team, away_team, kickoff_at)
-        except ValueError:
+        except ValueError as error:
             return _matches_page(
-                error="Enter home team, away team, and kickoff time.",
+                error=str(error),
                 status_code=400,
             )
 
-        return redirect(url_for("matches_page"))
+        return _matches_redirect()
 
     @app.post("/matches/<int:match_id>/odds")
     def add_match_odds(match_id):
@@ -157,7 +180,7 @@ def create_app():
                 status_code=400,
             )
 
-        return redirect(url_for("matches_page"))
+        return _matches_redirect()
 
     @app.post("/matches/<int:match_id>/result")
     def add_match_result(match_id):
@@ -171,7 +194,7 @@ def create_app():
                 status_code=400,
             )
 
-        return redirect(url_for("matches_page"))
+        return _matches_redirect()
 
     @app.post("/matches/<int:match_id>/decisions")
     def add_bet_decision(match_id):
@@ -196,7 +219,7 @@ def create_app():
                 status_code=400,
             )
 
-        return redirect(url_for("matches_page"))
+        return _matches_redirect()
 
     @app.post("/decisions/<int:decision_id>/bets")
     def add_bet(decision_id):
@@ -250,6 +273,23 @@ def create_app():
             ), 400
 
         return redirect(url_for("home"))
+
+    @app.post("/matches/sync")
+    def synchronise_matches():
+        try:
+            result = sync_laliga_matches()
+        except ValueError as error:
+            return _matches_page(
+                error=str(error),
+                status_code=503,
+            )
+
+        return _matches_page(
+            message=(
+                f"Sync complete: {result['created']} fixtures added, "
+                f"{result['updated']} existing fixtures updated."
+            ),
+        )
 
     return app
 

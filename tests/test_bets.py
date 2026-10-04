@@ -177,8 +177,8 @@ def test_homepage_displays_bet_and_exposure(funded_decision, invalid_deposit):
         assert response.status_code == 200
 
     html = response.get_data(as_text=True)
-    assert "Current balance: €90.00" in html
-    assert "Open exposure: €10.00" in html
+    assert "Current balance: <strong>€90.00</strong>" in html
+    assert "Open exposure: <strong>€10.00</strong>" in html
     assert "Sevilla vs Valencia" in html
     assert "stake €10.00" in html
     assert "status: open" in html

@@ -68,3 +68,12 @@ CREATE TABLE IF NOT EXISTS bets (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     settled_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS match_imports (
+    external_id INTEGER PRIMARY KEY
+        CHECK (external_id > 0),
+    match_id INTEGER NOT NULL UNIQUE
+        REFERENCES matches(id),
+    api_status TEXT NOT NULL,
+    last_synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

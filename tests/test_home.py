@@ -11,4 +11,4 @@ def test_home_page_loads_english_landing():
     page = response.get_data(as_text=True)
     assert "Nico's Elite Ball Knowledge" in page
     assert "LaLiga 2026-27" in page
-    assert "the application started successfully" in page
+    assert "Transaction history" in page
