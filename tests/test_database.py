@@ -39,3 +39,22 @@ def test_database_schema_and_connection_lifecycle(tmp_path, monkeypatch):
     with pytest.raises(sqlite3.ProgrammingError):
         db.execute("SELECT 1")
 
+def test_database_rejects_odds_for_missing_match(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    app = create_app()
+
+    with app.app_context():
+        db = get_db()
+
+        with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+            db.execute(
+                """
+                INSERT INTO match_odds
+                    (match_id, bookmaker, home_odds, draw_odds, away_odds)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (999, "bet365", 2.0, 3.0, 4.0),
+            )
+
+        db.rollback()
+        assert db.execute("SELECT COUNT(*) FROM match_odds").fetchone()[0] == 0

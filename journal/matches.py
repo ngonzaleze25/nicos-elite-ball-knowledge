@@ -1,5 +1,5 @@
 from database import get_db
-
+import math
 ALLOWED_BOOKMAKERS = ("bet365", "bwin")
 ALLOWED_STATUSES = ("scheduled", "finished")
 
@@ -42,6 +42,7 @@ def record_match_odds(match_id, bookmaker, home_odds, draw_odds, away_odds):
     """Save or replace 1X2 decimal odds for one bookmaker on one match."""
     if not isinstance(match_id, int) or isinstance(match_id, bool) or match_id <= 0:
         raise ValueError("Match id must be a positive integer.")
+
     if bookmaker not in ALLOWED_BOOKMAKERS:
         raise ValueError("Bookmaker must be 'bet365' or 'bwin'.")
 
@@ -50,8 +51,15 @@ def record_match_odds(match_id, bookmaker, home_odds, draw_odds, away_odds):
         ("draw", draw_odds),
         ("away", away_odds),
     ):
-        if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 1:
-            raise ValueError(f"{label.capitalize()} odds must be a number greater than 1.")
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not math.isfinite(value)
+            or value <= 1
+        ):
+            raise ValueError(
+                f"{label.capitalize()} odds must be a finite number greater than 1."
+            )
 
     db = get_db()
     match = db.execute(
