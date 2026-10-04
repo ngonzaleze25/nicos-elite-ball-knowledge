@@ -91,7 +91,10 @@ def test_record_match_odds_rejects_invalid_bookmaker(tmp_path, monkeypatch):
             record_match_odds(match_id, "unibet", 2.0, 3.0, 3.5)
 
 
-@pytest.mark.parametrize("odds", [1.0, 0.5, -2, True, "2.1"])
+@pytest.mark.parametrize(
+    "odds",
+    [1.0, 0.5, -2, True, "2.1", float("inf"), float("-inf"), float("nan")],
+)
 def test_record_match_odds_rejects_invalid_prices(tmp_path, monkeypatch, odds):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     app = create_app()

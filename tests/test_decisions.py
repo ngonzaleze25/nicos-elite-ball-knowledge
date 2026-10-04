@@ -142,3 +142,25 @@ def test_record_bet_decision_never_recommends_more_than_limit(tmp_path, monkeypa
 
         assert decision["quarter_kelly_stake_cents"] > 1000
         assert decision["recommended_stake_cents"] == 1000
+
+@pytest.mark.parametrize(
+    "probability",
+    [-0.1, 1.1, True, "0.5", float("inf"), float("-inf"), float("nan")],
+)
+def test_decision_rejects_invalid_probability(tmp_path, monkeypatch, probability):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    app = create_app()
+
+    with app.app_context():
+        match_id = create_match("Sevilla", "Valencia", "2026-10-10T20:00")
+        record_match_odds(match_id, "bet365", 2.5, 3.4, 3.1)
+
+        with pytest.raises(ValueError):
+            record_bet_decision(
+                match_id=match_id,
+                bookmaker="bet365",
+                selection="home",
+                model_probability=probability,
+            )
+
+        assert list_bet_decisions(match_id) == []

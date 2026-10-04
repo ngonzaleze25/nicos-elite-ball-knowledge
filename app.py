@@ -1,10 +1,14 @@
 import os
+from journal.probability import estimate_from_results
+from journal.sync import sync_laliga_matches
 from decimal import Decimal, InvalidOperation
-
+from journal.bets import list_bets, record_bet, settle_bet
 from bankroll.ledger import (
     get_balance_cents,
+    get_open_exposure_cents,
     list_transactions,
     record_deposit,
+    reset_available_balance,
 )
 from database import init_app, init_db
 from flask import Flask, redirect, render_template, request, url_for
@@ -16,7 +20,7 @@ from journal.decisions import (
 from journal.matches import (
     create_match,
     list_match_odds,
-    list_matches,
+    list_visible_matches,
     record_match_odds,
     record_match_result,
 )
@@ -49,10 +53,17 @@ def create_app():
     def home():
         balance_euros = Decimal(get_balance_cents()) / 100
         return render_template(
-            "index.html",
-            balance_euros=balance_euros,
-            transactions=list_transactions(),
+                "index.html",
+                balance_euros=balance_euros,
+                exposure_euros=Decimal(get_open_exposure_cents()) / 100,
+                bets=list_bets(),
+                transactions=list_transactions(),
         )
+
+    @app.post("/bankroll/reset")
+    def reset_bankroll():
+        reset_available_balance()
+        return redirect(url_for("home"))
 
     @app.post("/deposits")
     def add_deposit():
@@ -70,13 +81,15 @@ def create_app():
             return render_template(
                 "index.html",
                 balance_euros=balance_euros,
+                exposure_euros=Decimal(get_open_exposure_cents()) / 100,
+                bets=list_bets(),
                 transactions=list_transactions(),
                 error="Enter a positive euro amount with at most two decimal places and a description.",
             ), 400
 
         return redirect(url_for("home"))
 
-    def _matches_page(error=None, status_code=200):
+    def _matches_page(error=None, status_code=200, message=None):
         odds_input = request.args.get("decimal_odds", "").strip()
         calculator_probability = None
         calculator_error = None
@@ -88,7 +101,15 @@ def create_app():
                 calculator_error = "Enter decimal odds greater than 1."
                 status_code = 400
 
-        matches = list_matches()
+        view = request.values.get("view", "upcoming")
+        search = request.values.get("search", "").strip()
+        try:
+            days = int(request.values.get("days", "7"))
+            matches = list_visible_matches(view, search, days)
+        except ValueError as filter_error:
+            view, days = "upcoming", 7
+            matches = list_visible_matches(view, search, days)
+            error, status_code = str(filter_error), 400
         odds_by_match = {
             match["id"]: list_match_odds(match["id"])
             for match in matches
@@ -97,13 +118,35 @@ def create_app():
             match["id"]: list_bet_decisions(match["id"])
             for match in matches
         }
+        estimates_by_match = {}
+        estimate_errors = {}
+
+        for match in matches:
+            try:
+                estimates_by_match[match["id"]] = estimate_from_results(
+                    match["id"]
+                )
+            except ValueError as estimate_error:
+                estimate_errors[match["id"]] = str(estimate_error)
 
         return render_template(
             "matches.html",
+            balance_euros=Decimal(get_balance_cents()) / 100,
+            exposure_euros=Decimal(get_open_exposure_cents()) / 100,
             matches=matches,
             odds_by_match=odds_by_match,
             error=error,
+            message=message,
+            open_match=request.values.get("open_match", ""),
+            selected_view=view,
+            search=search,
+            days=days,
             decisions_by_match=decisions_by_match,
+            estimates_by_match=estimates_by_match,
+            estimate_errors=estimate_errors,
+            bets_by_decision={
+                bet["decision_id"]: bet for bet in list_bets()
+            },
             calculator_odds=odds_input,
             calculator_probability=calculator_probability,
             calculator_error=calculator_error,
@@ -113,6 +156,18 @@ def create_app():
     def matches_page():
         return _matches_page()
 
+    def _matches_redirect():
+        context = {
+            "view": request.form.get("view", "upcoming"),
+            "search": request.form.get("search", ""),
+            "days": request.form.get("days", "7"),
+        }
+        open_match = request.form.get("open_match", "")
+        if open_match.isdecimal():
+            context["open_match"] = open_match
+            context["_anchor"] = f"match-{open_match}"
+        return redirect(url_for("matches_page", **context))
+
     @app.post("/matches")
     def add_match():
         home_team = request.form.get("home_team", "").strip()
@@ -121,13 +176,13 @@ def create_app():
 
         try:
             create_match(home_team, away_team, kickoff_at)
-        except ValueError:
+        except ValueError as error:
             return _matches_page(
-                error="Enter home team, away team, and kickoff time.",
+                error=str(error),
                 status_code=400,
             )
 
-        return redirect(url_for("matches_page"))
+        return _matches_redirect()
 
     @app.post("/matches/<int:match_id>/odds")
     def add_match_odds(match_id):
@@ -149,7 +204,7 @@ def create_app():
                 status_code=400,
             )
 
-        return redirect(url_for("matches_page"))
+        return _matches_redirect()
 
     @app.post("/matches/<int:match_id>/result")
     def add_match_result(match_id):
@@ -163,7 +218,7 @@ def create_app():
                 status_code=400,
             )
 
-        return redirect(url_for("matches_page"))
+        return _matches_redirect()
 
     @app.post("/matches/<int:match_id>/decisions")
     def add_bet_decision(match_id):
@@ -171,24 +226,97 @@ def create_app():
         selection = request.form.get("selection", "").strip()
 
         try:
-            model_probability_percent = Decimal(
-                request.form.get("model_probability_percent", "").strip()
-            )
-            model_probability = model_probability_percent / 100
+            if selection not in ("home", "draw", "away"):
+                raise ValueError("Choose Home, Draw, or Away.")
+
+            estimate = estimate_from_results(match_id)
+            model_probability = estimate["probabilities"][selection]
+
             record_bet_decision(
                 match_id=match_id,
                 bookmaker=bookmaker,
                 selection=selection,
-                model_probability=float(model_probability),
+                model_probability=model_probability,
                 max_stake_cents=app.config["MAX_STAKE_CENTS"],
             )
-        except (InvalidOperation, ValueError):
+        except ValueError as error:
             return _matches_page(
-                error="Enter a valid bookmaker, selection, and model probability from 0 to 100.",
+                error=str(error),
                 status_code=400,
             )
 
-        return redirect(url_for("matches_page"))
+        return _matches_redirect()
+    @app.post("/decisions/<int:decision_id>/bets")
+    def add_bet(decision_id):
+        try:
+            stake_euros = Decimal(
+                request.form.get("stake_euros", "").strip()
+            )
+
+            if not stake_euros.is_finite() or stake_euros <= 0:
+                raise ValueError("Enter a positive, finite stake.")
+
+            limit_euros = Decimal(app.config["MAX_STAKE_CENTS"]) / 100
+            if stake_euros > limit_euros:
+                raise ValueError("Stake exceeds the configured limit.")
+
+            stake_cents = stake_euros * 100
+            if stake_cents != stake_cents.to_integral_value():
+                raise ValueError("Use at most two decimal places.")
+
+            record_bet(decision_id, int(stake_cents))
+
+        except InvalidOperation:
+            return _matches_page(
+                error="Enter a valid euro stake.",
+                status_code=400,
+            )
+        except ValueError as error:
+            return _matches_page(
+                error=str(error),
+                status_code=400,
+            )
+
+        if "view" in request.form:
+            return _matches_redirect()
+        return redirect(url_for("home"))
+    @app.post("/bets/<int:bet_id>/settlement")
+    def settle_recorded_bet(bet_id):
+        action = request.form.get("action", "").strip()
+
+        try:
+            if action not in ("settle", "void"):
+                raise ValueError("Choose settlement or a void refund.")
+
+            settle_bet(bet_id, void=(action == "void"))
+        except ValueError as error:
+            return render_template(
+                "index.html",
+                balance_euros=Decimal(get_balance_cents()) / 100,
+                exposure_euros=Decimal(get_open_exposure_cents()) / 100,
+                bets=list_bets(),
+                transactions=list_transactions(),
+                error=str(error),
+            ), 400
+
+        return redirect(url_for("home"))
+
+    @app.post("/matches/sync")
+    def synchronise_matches():
+        try:
+            result = sync_laliga_matches()
+        except ValueError as error:
+            return _matches_page(
+                error=str(error),
+                status_code=503,
+            )
+
+        return _matches_page(
+            message=(
+                f"Sync complete: {result['created']} fixtures added, "
+                f"{result['updated']} existing fixtures updated."
+            ),
+        )
 
     return app
 

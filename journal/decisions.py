@@ -2,7 +2,7 @@ from bankroll.kelly import calculate_kelly_stake
 from bankroll.ledger import get_balance_cents
 from database import get_db
 from journal.matches import ALLOWED_BOOKMAKERS
-
+import math
 
 ALLOWED_SELECTIONS = ("home", "draw", "away")
 DEFAULT_MAX_STAKE_CENTS = 1000
@@ -28,6 +28,7 @@ def record_bet_decision(
     if (
         not isinstance(model_probability, (int, float))
         or isinstance(model_probability, bool)
+        or not math.isfinite(model_probability)
         or model_probability < 0
         or model_probability > 1
     ):

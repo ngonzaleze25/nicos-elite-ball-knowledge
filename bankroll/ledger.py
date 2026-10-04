@@ -39,3 +39,56 @@ def list_transactions():
         ORDER BY id DESC
         """
     ).fetchall()
+
+
+def reset_available_balance():
+    """Withdraw the available balance without deleting bets or ledger history."""
+    db = get_db()
+    with db:
+        db.execute("BEGIN IMMEDIATE")
+        balance = get_balance_cents()
+        if balance <= 0:
+            return 0
+        db.execute(
+            """
+            INSERT INTO bankroll_transactions
+                (transaction_type, amount_cents, description)
+            VALUES ('withdrawal', ?, 'Reset available balance to zero')
+            """,
+            (-balance,),
+        )
+    return balance
+
+def validate_stake(amount_cents, max_stake_cents):
+    """Check a requested stake without changing the balance."""
+    if (
+        not isinstance(amount_cents, int)
+        or isinstance(amount_cents, bool)
+        or amount_cents <= 0
+    ):
+        raise ValueError("Stake must be a positive integer number of cents.")
+
+    if (
+        not isinstance(max_stake_cents, int)
+        or isinstance(max_stake_cents, bool)
+        or max_stake_cents < 0
+    ):
+        raise ValueError("Maximum stake must be a non-negative integer.")
+
+    if amount_cents > max_stake_cents:
+        raise ValueError("Stake exceeds the configured limit.")
+
+    if amount_cents > get_balance_cents():
+        raise ValueError("Insufficient available balance.")
+    
+
+def get_open_exposure_cents():
+    """Return the total stakes committed to unsettled bets."""
+    row = get_db().execute(
+        """
+        SELECT COALESCE(SUM(stake_cents), 0) AS exposure_cents
+        FROM bets
+        WHERE status = 'open'
+        """
+    ).fetchone()
+    return row["exposure_cents"]

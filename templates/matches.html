@@ -4,19 +4,70 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Matches - Nico's Elite Ball Knowledge</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
+    {% macro context_fields(match_id=none) %}
+    <input type="hidden" name="view" value="{{ selected_view }}">
+    <input type="hidden" name="search" value="{{ search }}">
+    <input type="hidden" name="days" value="{{ days }}">
+    {% if match_id is not none %}
+    <input type="hidden" name="open_match" value="{{ match_id }}">
+    {% endif %}
+    {% endmacro %}
     <main>
         <p><a href="{{ url_for('home') }}">Home</a></p>
         <h1>Matches</h1>
-        <p>Record LaLiga fixtures and manual bet365 / bwin 1X2 odds.</p>
+        <section class="card bankroll-summary" aria-label="Bankroll summary">
+            <p>Available bankroll<strong>€{{ "%.2f"|format(balance_euros) }}</strong></p>
+            <p>Open exposure<strong>€{{ "%.2f"|format(exposure_euros) }}</strong></p>
+        </section>
+        <p class="muted">Open stakes have already been deducted from the available bankroll.</p>
+        <p>Choose a synced LaLiga fixture and enter bet365 / bwin 1X2 odds.</p>
 
         {% if error %}
         <p role="alert">{{ error }}</p>
         {% endif %}
 
+        {% if message %}
+        <p role="status">{{ message }}</p>
+        {% endif %}
+
+        <h2>Synchronise LaLiga 2026–27</h2>
+        <form action="{{ url_for('synchronise_matches') }}" method="post">
+            {{ context_fields() }}
+            <button type="submit">Sync fixtures and results</button>
+        </form>
+        <p>Sync loads kickoff dates and results automatically. If it fails, your saved fixtures and bets remain available.</p>
+        <p>Football data provided by the
+            <a href="https://www.football-data.org/">Football-Data.org API</a>.
+        </p>
+
+        <nav aria-label="Match views">
+            {% for value, label in [('upcoming', 'Upcoming'), ('my_bets', 'My bets'), ('history', 'History')] %}
+            <a href="{{ url_for('matches_page', view=value, search=search, days=days) }}"
+               {% if selected_view == value %}aria-current="page"{% endif %}>{{ label }}</a>
+            {% endfor %}
+        </nav>
+        <form action="{{ url_for('matches_page') }}" method="get">
+            <input type="hidden" name="view" value="{{ selected_view }}">
+            <label for="team-search">Team</label>
+            <input id="team-search" name="search" type="search" value="{{ search }}" placeholder="Search a team">
+            <label for="day-window">Upcoming window</label>
+            <select id="day-window" name="days">
+                {% for window in [7, 14, 30] %}
+                <option value="{{ window }}" {% if days == window %}selected{% endif %}>Next {{ window }} days</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Apply filters</button>
+        </form>
+
+        <details {% if calculator_odds or calculator_error %}open{% endif %}>
+        <summary>Odds calculator</summary>
+        <div class="tools-body">
         <h2>Decimal odds to probability</h2>
         <form action="{{ url_for('matches_page') }}" method="get">
+            {{ context_fields() }}
             <label for="decimal_odds">Decimal odds</label>
             <input id="decimal_odds" name="decimal_odds" type="number"
                    min="1.01" step="any" value="{{ calculator_odds }}" required>
@@ -29,35 +80,37 @@
         <p>Implied probability: {{ "%.2f"|format(calculator_probability) }}%</p>
         {% endif %}
 
-        <h2>Add match</h2>
-        <form action="{{ url_for('add_match') }}" method="post">
-            <label for="home_team">Home team</label>
-            <input id="home_team" name="home_team" type="text" required>
+        </div>
+        </details>
 
-            <label for="away_team">Away team</label>
-            <input id="away_team" name="away_team" type="text" required>
-
-            <label for="kickoff_at">Kickoff date and time</label>
-            <input id="kickoff_at" name="kickoff_at" type="datetime-local" required>
-
-            <button type="submit">Add match</button>
-        </form>
-
-        <h2>Scheduled and finished matches</h2>
+        <h2>{{ {'upcoming': 'Upcoming matches', 'my_bets': 'My bets', 'history': 'Match history'}[selected_view] }}</h2>
+        <p>{{ matches|length }} matches shown · Kickoff times in Madrid time.</p>
+        {% if selected_view == 'upcoming' %}
+        <p>Next {{ days }} days. Expand a match to enter odds and record your decision.</p>
+        {% elif selected_view == 'my_bets' %}
+        <p>Open bets appear first, including past fixtures awaiting settlement. Settle bets on the homepage.</p>
+        {% else %}
+        <p>Past fixtures and completed results, most recent first.</p>
+        {% endif %}
         {% if not matches %}
-        <p>No matches recorded yet.</p>
+        <p>No matches match these filters. Try another team or a wider upcoming window.</p>
         {% endif %}
 
         {% for match in matches %}
-        <section>
+        <details class="match" id="match-{{ match.id }}"{% if open_match == match.id|string %} open{% endif %}>
+            <summary>
             <h3>{{ match.home_team }} vs {{ match.away_team }}</h3>
-            <p>Kickoff: {{ match.kickoff_at }} · Status: {{ match.status }}</p>
+            <span class="match-meta">{{ match.display_kickoff }} · Status: {{ match.api_status or match.status }}{% if match.has_open_bet %} · Open bet{% endif %}</span>
+            </summary>
+            <div class="match-body">
 
             {% if match.status == "finished" %}
             <p>Final score: {{ match.home_goals }}–{{ match.away_goals }}</p>
             {% endif %}
 
+            {% if match.needs_manual_score %}
             <form action="{{ url_for('add_match_result', match_id=match.id) }}" method="post">
+                {{ context_fields(match.id) }}
                 <label for="home_goals-{{ match.id }}">Home goals</label>
                 <input id="home_goals-{{ match.id }}" name="home_goals"
                        type="number" min="0" step="1"
@@ -72,6 +125,7 @@
 
                 <button type="submit">Save final score</button>
             </form>
+            {% endif %}
 
             {% set odds_rows = odds_by_match.get(match.id, []) %}
             {% if odds_rows %}
@@ -88,7 +142,29 @@
             {% else %}
             <p>No odds entered yet.</p>
             {% endif %}
-                        {% set decision_rows = decisions_by_match.get(match.id, []) %}
+            <h4>Poisson estimates</h4>
+            {% set estimate = estimates_by_match.get(match.id) %}
+            {% if estimate %}
+            <p>
+                Home: {{ "%.2f"|format(estimate.probabilities.home * 100) }}% ·
+                Draw: {{ "%.2f"|format(estimate.probabilities.draw * 100) }}% ·
+                Away: {{ "%.2f"|format(estimate.probabilities.away * 100) }}%
+            </p>
+            <p class="muted">
+                Expected goals:
+                home {{ "%.2f"|format(estimate.home_expected_goals) }},
+                away {{ "%.2f"|format(estimate.away_expected_goals) }}.
+                Based on {{ estimate.home_sample_size }} earlier home games
+                and {{ estimate.away_sample_size }} earlier away games.
+                Simple estimates from final scores.
+            </p>
+            {% else %}
+            <p class="muted">
+                Estimate unavailable: {{ estimate_errors.get(match.id) }}
+            </p>
+            {% endif %}
+
+            {% set decision_rows = decisions_by_match.get(match.id, []) %}
             <h4>Bet decisions</h4>
             {% if decision_rows %}
             <ul>
@@ -102,6 +178,22 @@
                     quarter Kelly €{{ "%.2f"|format(decision.quarter_kelly_stake_cents / 100) }},
                     suggested stake €{{ "%.2f"|format(decision.recommended_stake_cents / 100) }},
                     {{ decision.recommendation.replace("_", " ") }}
+                    {% if decision.id in bets_by_decision %}
+                    <p>Bet already recorded. See the homepage for its status.</p>
+                    {% elif match.can_record_stake %}
+                    <form action="{{ url_for('add_bet', decision_id=decision.id) }}"
+                          method="post">
+                        {{ context_fields(match.id) }}
+                        <label for="stake-{{ decision.id }}">Stake (€)</label>
+                        <input id="stake-{{ decision.id }}"
+                               name="stake_euros"
+                               type="number"
+                               min="0.01"
+                               step="0.01"
+                               required>
+                        <button type="submit">Record stake</button>
+                    </form>
+                    {% endif %}
                 </li>
                 {% endfor %}
             </ul>
@@ -109,7 +201,9 @@
             <p>No bet decisions recorded yet.</p>
             {% endif %}
 
+            {% if match.can_record_stake and odds_rows and estimate %}
             <form action="{{ url_for('add_bet_decision', match_id=match.id) }}" method="post">
+                {{ context_fields(match.id) }}
                 <label for="decision-bookmaker-{{ match.id }}">Decision bookmaker</label>
                 <select id="decision-bookmaker-{{ match.id }}" name="bookmaker" required>
                     <option value="bet365">bet365</option>
@@ -123,18 +217,14 @@
                     <option value="away">Away</option>
                 </select>
 
-                <label for="model_probability_percent-{{ match.id }}">Model probability (%)</label>
-                <input id="model_probability_percent-{{ match.id }}"
-                       name="model_probability_percent"
-                       type="number"
-                       min="0"
-                       max="100"
-                       step="0.01"
-                       required>
+                <p class="muted">The selected outcome uses the Poisson probability shown above.</p>
 
                 <button type="submit">Save bet decision</button>
             </form>
+            {% endif %}
+            {% if match.can_record_stake %}
             <form action="{{ url_for('add_match_odds', match_id=match.id) }}" method="post">
+                {{ context_fields(match.id) }}
                 <label for="bookmaker-{{ match.id }}">Bookmaker</label>
                 <select id="bookmaker-{{ match.id }}" name="bookmaker" required>
                     <option value="bet365">bet365</option>
@@ -155,7 +245,9 @@
 
                 <button type="submit">Save odds</button>
             </form>
-        </section>
+            {% endif %}
+            </div>
+        </details>
         {% endfor %}
     </main>
 </body>

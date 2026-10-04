@@ -4,16 +4,25 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nico's Elite Ball Knowledge</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <main>
         <h1>Nico's Elite Ball Knowledge</h1>
         <p>Analyze your LaLiga 2026-27 betting decisions.</p>
-        <p>Status: the application started successfully.</p>
-        <p><a href="{{ url_for('matches_page') }}">Matches</a></p>
 
+        <nav aria-label="Main navigation">
+            <a href="{{ url_for('home') }}" aria-current="page">Home</a>
+            <a href="{{ url_for('matches_page') }}">Matches</a>
+        </nav>
+
+        <section class="card">
         <h2>Bankroll</h2>
-        <p>Current balance: €{{ "%.2f"|format(balance_euros) }}</p>
+        <div class="bankroll-summary">
+            <p>Current balance: <strong>€{{ "%.2f"|format(balance_euros) }}</strong></p>
+            <p>Open exposure: <strong>€{{ "%.2f"|format(exposure_euros) }}</strong></p>
+        </div>
+        <p>Open stakes have already been deducted from the current balance.</p>
         {% if error %}
         <p role="alert">{{ error }}</p>
         {% endif %}
@@ -24,8 +33,46 @@
             <input id="description" name="description" type="text" required>
             <button type="submit">Record deposit</button>
         </form>
-                <h2>Transaction history</h2>
+        <form action="{{ url_for('reset_bankroll') }}" method="post">
+            <button type="submit" {% if balance_euros <= 0 %}disabled{% endif %}>Reset available balance to €0</button>
+        </form>
+        <p class="muted">Records a withdrawal of your available balance. Keeps transaction history and open bets; future payouts or refunds can add money again.</p>
+
+        </section>
+        <section class="card">
+        <h2>Recorded bets</h2>
+        {% if bets %}
+        <ul class="bet-list">
+            {% for bet in bets %}
+            <li>
+                {{ bet.home_team }} vs {{ bet.away_team }}:
+                {{ bet.bookmaker }} — {{ bet.selection }},
+                stake €{{ "%.2f"|format(bet.stake_cents / 100) }},
+                odds {{ "%.2f"|format(bet.decimal_odds) }},
+                status: {{ bet.status }}.
+                {% if bet.status == "open" %}
+                <form action="{{ url_for('settle_recorded_bet', bet_id=bet.id) }}"
+                      method="post">
+                    <button type="submit" name="action" value="settle">
+                        Settle from final score
+                    </button>
+                    <button type="submit" name="action" value="void">
+                        Void bet and refund stake
+                    </button>
+                </form>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>No bets recorded yet.</p>
+        {% endif %}
+
+        </section>
+        <section class="card">
+        <h2>Transaction history</h2>
         {% if transactions %}
+        <div class="table-scroll">
         <table>
             <thead>
                 <tr>
@@ -46,9 +93,11 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
         <p>No transactions yet.</p>
         {% endif %}
+        </section>
     </main>
 </body>
 </html>
