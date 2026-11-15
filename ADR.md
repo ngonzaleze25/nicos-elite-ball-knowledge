@@ -35,3 +35,12 @@ Decision: Keep bet365 and bwin odds manually entered and record stakes only with
 Alternatives considered: Automatic bookmaker integration could reduce manual entry, but it would add external dependencies and financial-action handling beyond the intended assignment scope. Live-odds scraping would also require maintenance when bookmaker pages change.
 Consequences: The application remains focused on analysis, bankroll tracking, and explaining decisions. Users must obtain prices and place any actual bets separately, so recorded odds and stakes may differ from what was available or placed with a bookmaker.
 
+## 6. Split Journal and Bankroll into two services
+
+Context: In Assignment 1, Journal and Bankroll ran in the same Flask app and shared one SQLite database. In Assignment 2, each service needs its own database.
+
+Decision: Keep the same two domains. Journal will own matches, imported fixture links, odds, betting decisions, and recorded bets. Bankroll will own the money ledger. When Journal needs the available balance for a stake suggestion, it will ask Bankroll over HTTP.
+
+Alternatives considered: I considered having the browser fetch the balance and pass it to Journal. I chose a direct HTTP call so Journal can get the balance from Bankroll, which owns the money ledger.
+
+Consequences: If Bankroll does not respond before the timeout, Journal will show that the stake suggestion is unavailable. The user can still view matches and odds. Recording a bet and deducting its stake now touch two databases, so the single SQLite transaction from Assignment 1 can no longer cover both writes.
