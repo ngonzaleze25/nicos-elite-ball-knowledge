@@ -1,6 +1,6 @@
 import pytest
 
-from bankroll.kelly import (
+from services.bankroll.kelly import (
     calculate_full_kelly_fraction,
     calculate_kelly_stake,
 )
