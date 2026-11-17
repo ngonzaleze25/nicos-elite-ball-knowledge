@@ -1,0 +1,49 @@
+import os
+import time
+from urllib.parse import unquote, urlparse
+
+import pymssql
+
+def get_connection():
+    database_url = os.environ.get("DATABASE_URL")
+
+    if not database_url:
+        raise ValueError("DATABASE_URL must be set.")
+    
+    parsed = urlparse(database_url)
+
+    if parsed.scheme != "mssql":
+        raise ValueError("DATABASE_URL must use the mssql:// scheme.")
+    
+    if not all([
+        parsed.hostname,
+        parsed.username,
+        parsed.password,
+        parsed.path.lstrip("/"),
+    ]):
+        raise ValueError(
+            "DATABASE_URL must include a host, username, password, and database."
+        )
+    return pymssql.connect(
+        server=parsed.hostname,
+        port=parsed.port or 1433,
+        user=unquote(parsed.username),
+        password=unquote(parsed.password),
+        database=unquote(parsed.path.lstrip("/")),
+        login_timeout=5,
+        timeout=5,
+        autocommit=False,
+    )
+
+
+def connect_with_retry():
+    for attempt in range(6):
+        try:
+            return get_connection()
+        except pymssql.OperationalError:
+            if attempt == 5:
+                raise
+
+            delay = 2 ** (attempt + 1)
+            print(f"Database unavailable; retrying in {delay} seconds.")
+            time.sleep(delay)
