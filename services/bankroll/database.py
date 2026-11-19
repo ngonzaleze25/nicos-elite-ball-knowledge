@@ -47,3 +47,22 @@ def connect_with_retry():
             delay = 2 ** (attempt + 1)
             print(f"Database unavailable; retrying in {delay} seconds.")
             time.sleep(delay)
+
+def check_database_health():
+    connection = get_connection()
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE dbo.health_probe "
+                "SET checked_at = SYSUTCDATETIME() WHERE id = 1;"
+            )
+            cursor.execute("SELECT id FROM dbo.health_probe WHERE id = 1;")
+
+            if cursor.fetchone() is None:
+                raise RuntimeError("Health probe row 1 is missing.")
+    finally:
+        try:
+            connection.rollback()
+        finally:
+            connection.close()

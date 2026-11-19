@@ -107,3 +107,28 @@ def test_connection_failure_does_not_run_migrations(monkeypatch):
     with pytest.raises(pymssql.OperationalError):
         bankroll_app.create_app()
     migrate.assert_not_called()
+
+def test_health_reports_database_status(monkeypatch, capsys):
+    monkeypatch.setattr(bankroll_app, "connect_with_retry", Mock())
+    monkeypatch.setattr(bankroll_app, "run_migrations", Mock())
+    monkeypatch.setenv("APP_VERSION", "test")
+    probe = Mock(side_effect=[None, pymssql.OperationalError("offline")])
+    monkeypatch.setattr(bankroll_app, "check_database_health", probe)
+
+    client = bankroll_app.create_app().test_client()
+
+    healthy = client.get("/health")
+    assert healthy.status_code == 200
+    assert healthy.json == {"status": "ok", "db": "ok", "version": "test"}
+
+    unavailable = client.get("/health")
+    assert unavailable.status_code == 503
+    assert unavailable.json == {
+        "status": "error",
+        "db": "unavailable",
+        "version": "test",
+    }
+
+    logs = capsys.readouterr().out
+    assert "GET /health 200 " in logs
+    assert "GET /health 503 " in logs
