@@ -41,6 +41,17 @@ services:
       DATABASE_URL: "mssql://bankroll_app:${BANKROLL_DB_PASSWORD:?Set BANKROLL_DB_PASSWORD}@sqlserver:1433/bankroll"
     ports:
       - "127.0.0.1:8000:8000"
+  journal:
+    build: ./services/journal
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: "mssql://journal_app:${JOURNAL_DB_PASSWORD:?Set JOURNAL_DB_PASSWORD}@sqlserver:1433/journal"
+    ports:
+      - "127.0.0.1:8001:8000"
+
+
 
 volumes:
   sqlserver-data:
