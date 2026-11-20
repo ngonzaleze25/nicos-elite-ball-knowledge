@@ -32,5 +32,15 @@ services:
     command:
       - 'SQLCMDPASSWORD="$$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -C -b -d master -i /init.sql'
 
+  bankroll:
+    build: ./services/bankroll
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: "mssql://bankroll_app:${BANKROLL_DB_PASSWORD:?Set BANKROLL_DB_PASSWORD}@sqlserver:1433/bankroll"
+    ports:
+      - "127.0.0.1:8000:8000"
+
 volumes:
   sqlserver-data:
