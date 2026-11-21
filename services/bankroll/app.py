@@ -65,4 +65,38 @@ def create_app():
 
         return {"balance_cents": balance_cents}
 
+    @app.post("/deposits")
+    def add_deposit():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "Send a JSON object."}, 400
+
+        amount_cents = data.get("amount_cents")
+        description = data.get("description")
+
+        if type(amount_cents) is not int or not 1 <= amount_cents <= 2_147_483_647:
+            return {"error": "amount_cents must be a positive SQL Server integer."}, 400
+
+        if not isinstance(description, str) or not description.strip():
+            return {"error": "Enter a description."}, 400
+
+        try:
+            with closing(get_connection()) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO dbo.bankroll_transactions
+                            (transaction_type, amount_cents, description)
+                        OUTPUT INSERTED.id
+                        VALUES ('deposit', %s, %s);
+                        """,
+                        (amount_cents, description.strip()),
+                    )
+                    deposit_id = cursor.fetchone()[0]
+                connection.commit()
+        except Error:
+            return {"error": "Bankroll database unavailable"}, 503
+
+        return {"id": deposit_id, "amount_cents": amount_cents}, 201
+
     return app
