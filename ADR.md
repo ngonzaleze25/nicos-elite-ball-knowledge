@@ -44,3 +44,11 @@ Decision: Keep the same two domains. Journal will own matches, imported fixture 
 Alternatives considered: I considered having the browser fetch the balance and pass it to Journal. I chose a direct HTTP call so Journal can get the balance from Bankroll, which owns the money ledger.
 
 Consequences: If Bankroll does not respond before the timeout, Journal will show that the stake suggestion is unavailable. The user can still view matches and odds. Recording a bet and deducting its stake now touch two databases, so the single SQLite transaction from Assignment 1 can no longer cover both writes.
+
+## 7. Data and Migration
+Context: Assignment 1 stored both domains in one SQLite database. The split gives Journal and Bankroll separate SQL Server databases.
+
+Decision: Journal owns matches and Bankroll owns ledger transactions. Each service runs its own numbered SQL files at startup and records which ones ran in schema_migrations.
+Alternatives considered: Explain why you chose numbered SQL files over the monolith’s approach of creating the schema on first boot.
+
+Consequences: Recording a bet and deducting its stake now span two databases, so one database transaction can’t protect both writes. If a migration fails, its transaction rolls back. If an already applied migration needs correcting, write a new numbered migration.
