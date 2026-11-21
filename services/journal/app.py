@@ -1,5 +1,7 @@
 import os
 import time
+import json
+from urllib.request import urlopen
 
 from contextlib import closing
 from flask import Flask,g,request
@@ -7,6 +9,11 @@ from pymssql import Error
 
 from services.journal.database import check_database_health, connect_with_retry, get_connection
 from services.journal.migrate import run_migrations
+
+def fetch_bankroll_balance():
+    base_url = os.environ["BANKROLL_URL"].rstrip("/")
+    with urlopen(f"{base_url}/balance", timeout=2) as response:
+        return json.load(response)["balance_cents"]
 
 
 def create_app():
@@ -58,6 +65,15 @@ def create_app():
                 """)
                 matches = cursor.fetchall()
 
-        return {"matches": matches}
+        try:
+            balance_cents = fetch_bankroll_balance()
+        except (OSError, ValueError, KeyError, TypeError):
+            balance_cents = None
+
+        return {
+            "matches": matches,
+            "balance_cents": balance_cents,
+            "bankroll_status": "unavailable" if balance_cents is None else "ok",
+        }
 
     return app

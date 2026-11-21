@@ -1,10 +1,15 @@
 import os
 import time
+from contextlib import closing
 
 from flask import Flask,g,request
 from pymssql import Error
 
-from services.bankroll.database import check_database_health, connect_with_retry
+from services.bankroll.database import (
+    check_database_health,
+    connect_with_retry,
+    get_connection,
+)
 from services.bankroll.migrate import run_migrations
 
 
@@ -44,5 +49,20 @@ def create_app():
             }, 503
 
         return {"status": "ok", "db": "ok", "version": version}
+
+    @app.get("/balance")
+    def balance():
+        try:
+            with closing(get_connection()) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT COALESCE(SUM(CAST(amount_cents AS BIGINT)), 0)
+                        FROM dbo.bankroll_transactions;
+                    """)
+                    balance_cents = cursor.fetchone()[0]
+        except Error:
+            return {"error": "Bankroll database unavailable"}, 503
+
+        return {"balance_cents": balance_cents}
 
     return app
