@@ -49,6 +49,15 @@ Consequences: If Bankroll does not respond before the timeout, Journal will show
 Context: Assignment 1 stored both domains in one SQLite database. The split gives Journal and Bankroll separate SQL Server databases.
 
 Decision: Journal owns matches and Bankroll owns ledger transactions. Each service runs its own numbered SQL files at startup and records which ones ran in schema_migrations.
-Alternatives considered: Explain why you chose numbered SQL files over the monolith’s approach of creating the schema on first boot.
+Alternatives considered: I considered keeping the first-boot schema setup from Assignment 1. I chose numbered SQL migrations so each service can apply changes in order and preserve existing rows.
 
 Consequences: Recording a bet and deducting its stake now span two databases, so one database transaction can’t protect both writes. If a migration fails, its transaction rolls back. If an already applied migration needs correcting, write a new numbered migration.
+
+## 8. Azure Hosting and Scaling
+Context: The browser needs a public URL, and the two APIs need somewhere to run after deployment.
+
+Decision: Azure Storage hosts the static UI. Bankroll and Journal run in one Container Apps environment on Consumption, each with its own serverless SQL database. GitHub Actions deploys using OIDC.
+
+Alternatives considered: I considered running both APIs on an always-on VM. I chose Container Apps Consumption because the APIs can scale to zero between requests. The databases use the serverless free offer, and static hosting costs depend on storage and traffic.
+
+Consequences: After idle time, a container may need to start and its database may need to resume, so the API retries the database connection with a delay. Each app is limited to one replica while migrations run at startup. At 100× traffic, I would check request latency and database usage, move migrations to a separate deployment step before allowing multiple replicas, and raise the database capacity if measurements show it is the bottleneck.
