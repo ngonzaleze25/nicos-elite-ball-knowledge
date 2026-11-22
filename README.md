@@ -45,6 +45,19 @@ Synchronisation retrieves LaLiga fixtures and results for the season starting in
 
 Do not commit API credentials. API errors are displayed without removing existing records.
 
+### Fixture sync in the Compose app
+
+Load the local database settings, then enter the football-data.org token into the hidden prompt in the same VS Code zsh terminal:
+
+```zsh
+source "$HOME/.config/betledger/compose.zsh"
+read -rs 'FOOTBALL_DATA_API_TOKEN?Paste the football-data.org token, then press Enter: '
+export FOOTBALL_DATA_API_TOKEN
+docker compose up -d --build
+```
+
+Open http://127.0.0.1:8080 and select **Sync LaLiga fixtures**. Journal uses the feed's fixture ID to update dates, statuses, and results on later syncs. Confirmed kickoffs display in the browser's local timezone. Unconfirmed times show **Kickoff TBC**. Previously imported fixtures remain available if the feed is temporarily down. Keep the token on the Journal service, with Azure deployment using a secret for `FOOTBALL_DATA_API_TOKEN`.
+
 ## Using the Application
 
 1. Record your starting bankroll on Home.

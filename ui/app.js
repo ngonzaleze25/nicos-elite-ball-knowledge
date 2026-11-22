@@ -7,15 +7,30 @@ const kickoffFormat = new Intl.DateTimeFormat("en-GB", {
     day: "numeric", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit", timeZoneName: "short",
 });
+const fixtureStates = {
+    SCHEDULED: "Scheduled",
+    TIMED: "Confirmed",
+    IN_PLAY: "In play",
+    PAUSED: "Half time",
+    EXTRA_TIME: "Extra time",
+    PENALTY_SHOOTOUT: "Penalties",
+    FINISHED: "Finished",
+    SUSPENDED: "Suspended",
+    POSTPONED: "Postponed",
+    CANCELLED: "Cancelled",
+    AWARDED: "Awarded",
+};
+const unconfirmedKickoff = new Set(["SCHEDULED", "POSTPONED", "CANCELLED"]);
+let fixtures = null;
 
 function message(element, text, state = "") {
     element.textContent = text;
     element.dataset.state = state;
 }
 
-async function requestJson(baseUrl, path, body) {
+async function requestJson(baseUrl, path, body, timeoutMs = 12000) {
     if (!baseUrl) throw new Error("The API address is missing. Check config.js.");
-    const options = { signal: AbortSignal.timeout(12000) };
+    const options = { signal: AbortSignal.timeout(timeoutMs) };
     if (body) {
         options.method = "POST";
         options.headers = { "Content-Type": "application/json" };
@@ -29,10 +44,10 @@ async function requestJson(baseUrl, path, body) {
             ? "Could not confirm the save. Refresh before trying again."
             : "The service could not be reached. Try Refresh.");
     }
-    if (response.status === 503) {
+    const data = await response.json().catch(() => null);
+    if (response.status === 503 && !data?.error) {
         throw new Error("The service may be starting up. Try again shortly.");
     }
-    const data = await response.json().catch(() => null);
     if (!response.ok) {
         throw new Error(data?.error || "The request failed (HTTP " + response.status + ").");
     }
@@ -50,39 +65,55 @@ async function loadBalance() {
     }
 }
 
-async function loadFixtures() {
+function renderFixtures() {
+    if (fixtures === null) return;
     const status = byId("fixture-status");
     const table = byId("fixture-table");
+    const upcoming = byId("fixture-filter").value === "upcoming";
+    const visible = upcoming ? fixtures.filter((match) => (
+        match.source_status === "SCHEDULED" || match.source_status === "TIMED"
+    )) : fixtures;
+    const rows = visible.map((match) => {
+        const row = document.createElement("tr");
+        const kickoff = new Date(match.kickoff_at);
+        const hasTime = match.kickoff_at && !unconfirmedKickoff.has(match.source_status)
+            && !Number.isNaN(kickoff.getTime());
+        const label = fixtureStates[match.source_status];
+        const score = match.home_goals !== null && match.away_goals !== null
+            ? " · " + match.home_goals + "–" + match.away_goals : "";
+        for (const text of [
+            match.home_team + " vs " + match.away_team,
+            hasTime ? kickoffFormat.format(kickoff) : "Kickoff TBC",
+            label + score,
+        ]) {
+            const cell = document.createElement("td");
+            cell.textContent = text;
+            row.append(cell);
+        }
+        return row;
+    });
+    byId("fixtures").replaceChildren(...rows);
+    table.hidden = rows.length === 0;
+    const emptyMessage = fixtures.length === 0
+        ? "No fixtures yet. Select Sync LaLiga fixtures to load the schedule."
+        : "No upcoming fixtures.";
+    message(status, rows.length === 0 ? emptyMessage : "");
+}
+
+async function loadFixtures() {
     const journalBalance = byId("journal-balance");
     try {
         const data = await requestJson(config?.journalUrl, "/matches");
-        const rows = data.matches.map((match) => {
-            const row = document.createElement("tr");
-            const kickoff = new Date(match.kickoff_at);
-            const cells = [
-                match.home_team + " vs " + match.away_team,
-                Number.isNaN(kickoff.getTime()) ? match.kickoff_at : kickoffFormat.format(kickoff),
-                match.status === "finished"
-                    ? "Finished · " + match.home_goals + "–" + match.away_goals
-                    : "Scheduled",
-            ];
-            for (const text of cells) {
-                const cell = document.createElement("td");
-                cell.textContent = text;
-                row.append(cell);
-            }
-            return row;
-        });
-        byId("fixtures").replaceChildren(...rows);
-        table.hidden = rows.length === 0;
-        message(status, rows.length === 0 ? "No fixtures yet." : "");
+        fixtures = data.matches;
+        renderFixtures();
         message(journalBalance, data.bankroll_status === "ok"
             ? "Balance reported to Journal: " + euros.format(data.balance_cents / 100)
             : "Bankroll is unavailable. Journal fixtures are still available.");
     } catch (error) {
-        table.hidden = true;
+        fixtures = null;
+        byId("fixture-table").hidden = true;
         message(journalBalance, "");
-        message(status, error.message, "error");
+        message(byId("fixture-status"), error.message, "error");
     }
 }
 
@@ -105,17 +136,7 @@ function depositPayload(fields) {
     return { amount_cents: cents, description: fields.get("description").trim() };
 }
 
-function fixturePayload(fields) {
-    const kickoff = new Date(fields.get("kickoff_at"));
-    if (Number.isNaN(kickoff.getTime())) throw new Error("Enter a valid kickoff time.");
-    return {
-        home_team: fields.get("home_team").trim(),
-        away_team: fields.get("away_team").trim(),
-        kickoff_at: kickoff.toISOString(),
-    };
-}
-
-function bindForm(formId, messageId, baseUrl, path, payload, successMessage) {
+function bindForm(formId, messageId, baseUrl, path, payload, successMessage, timeoutMs) {
     const form = byId(formId);
     const output = byId(messageId);
     const button = form.querySelector("button");
@@ -124,7 +145,7 @@ function bindForm(formId, messageId, baseUrl, path, payload, successMessage) {
         button.disabled = true;
         message(output, "Saving…");
         try {
-            await requestJson(baseUrl, path, payload(new FormData(form)));
+            await requestJson(baseUrl, path, payload(new FormData(form)), timeoutMs);
             form.reset();
             message(output, successMessage, "success");
             await refresh();
@@ -137,6 +158,7 @@ function bindForm(formId, messageId, baseUrl, path, payload, successMessage) {
 }
 
 bindForm("deposit-form", "deposit-message", config?.bankrollUrl, "/deposits", depositPayload, "Deposit recorded.");
-bindForm("fixture-form", "fixture-message", config?.journalUrl, "/matches", fixturePayload, "Fixture added.");
+bindForm("fixture-form", "fixture-message", config?.journalUrl, "/matches/sync", () => ({}), "Fixtures synced.", 25000);
+byId("fixture-filter").addEventListener("change", renderFixtures);
 byId("refresh").addEventListener("click", refresh);
 refresh();

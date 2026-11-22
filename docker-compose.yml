@@ -49,6 +49,7 @@ services:
     environment:
       DATABASE_URL: "mssql://journal_app:${JOURNAL_DB_PASSWORD:?Set JOURNAL_DB_PASSWORD}@sqlserver:1433/journal"
       BANKROLL_URL: "http://bankroll:8000"
+      FOOTBALL_DATA_API_TOKEN: "${FOOTBALL_DATA_API_TOKEN:-}"
     ports:
       - "127.0.0.1:8001:8000"
 

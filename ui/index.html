@@ -34,34 +34,32 @@
                 <p id="deposit-message" class="message" role="status"></p>
             </section>
             <section class="panel" aria-labelledby="fixture-title">
-                <h2 id="fixture-title">Add fixture</h2>
+                <h2 id="fixture-title">LaLiga schedule</h2>
+                <p>Sync the latest fixtures, kickoff times, and results.</p>
                 <form id="fixture-form">
-                    <div class="teams">
-                        <div>
-                            <label for="home-team">Home team</label>
-                            <input id="home-team" name="home_team" maxlength="120" required>
-                        </div>
-                        <div>
-                            <label for="away-team">Away team</label>
-                            <input id="away-team" name="away_team" maxlength="120" required>
-                        </div>
-                    </div>
-                    <label for="kickoff">Kickoff (local time)</label>
-                    <input id="kickoff" name="kickoff_at" type="datetime-local" required>
-                    <button type="submit">Add fixture</button>
+                    <button type="submit">Sync LaLiga fixtures</button>
                 </form>
                 <p id="fixture-message" class="message" role="status"></p>
+                <p class="muted">Football data provided by the <a href="https://www.football-data.org/">Football-Data.org API</a>.</p>
             </section>
         </div>
         <section class="panel journal" aria-labelledby="journal-title">
-            <h2 id="journal-title">Journal</h2>
+            <div class="journal-header">
+                <h2 id="journal-title">Journal</h2>
+                <label for="fixture-filter">Show
+                    <select id="fixture-filter">
+                        <option value="upcoming">Upcoming</option>
+                        <option value="all">All fixtures</option>
+                    </select>
+                </label>
+            </div>
             <p id="journal-balance" class="muted" role="status"></p>
             <p id="fixture-status" role="status">Loading fixtures…</p>
             <div class="table-scroll" id="fixture-table" hidden>
                 <table>
                     <thead><tr>
                         <th scope="col">Fixture</th>
-                        <th scope="col">Kickoff</th>
+                        <th scope="col">Kickoff (local time)</th>
                         <th scope="col">Status</th>
                     </tr></thead>
                     <tbody id="fixtures"></tbody>
