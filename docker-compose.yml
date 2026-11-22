@@ -52,5 +52,15 @@ services:
     ports:
       - "127.0.0.1:8001:8000"
 
+  ui:
+    image: nginx:alpine
+    depends_on:
+      - bankroll
+      - journal
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+
 volumes:
   sqlserver-data:

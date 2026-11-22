@@ -1,0 +1,49 @@
+:root {
+    font: 16px/1.5 system-ui, sans-serif;
+    color: #172033;
+    background: #f5f6f8;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.masthead { background: #172033; color: white; }
+.masthead-inner, main { width: min(100% - 2rem, 65rem); margin-inline: auto; }
+.masthead-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-block: 1.6rem 1.8rem;
+}
+h1 { margin: 0; font-size: clamp(1.55rem, 5vw, 2.35rem); line-height: 1.15; }
+h2 { margin: 0 0 1rem; font-size: 1.25rem; }
+.season { margin: 0 0 .4rem; color: #f4d384; font-size: .9rem; font-weight: 700; }
+main { padding-block: 1.5rem 3rem; }
+.forms { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.panel { padding: 1.25rem; border: 1px solid #d6dae2; border-radius: .65rem; background: white; min-width: 0; }
+.journal { margin-top: 1rem; }
+.balance { margin: 0 0 1rem; font-size: 1.85rem; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; }
+.muted { color: #536078; }
+form { display: grid; gap: .45rem; }
+label { display: block; font-weight: 600; margin-top: .25rem; }
+input, button { font: inherit; padding: .55rem .7rem; border: 1px solid #9ba7bb; border-radius: .35rem; }
+input { width: 100%; min-width: 0; min-height: 2.75rem; background: white; color: inherit; }
+button { cursor: pointer; background: #172033; color: white; font-weight: 600; }
+form button { justify-self: start; margin-top: .5rem; }
+#refresh { border-color: #a9b8d1; }
+button:disabled { cursor: wait; opacity: .65; }
+:focus-visible { outline: 3px solid #3d69ce; outline-offset: 2px; }
+.teams { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.teams label { margin-bottom: .45rem; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+th, td { padding: .65rem .7rem; border-bottom: 1px solid #e5e7eb; }
+th { background: #f1f4f8; }
+.message { margin: .75rem 0 0; }
+.message:empty, #fixture-status:empty, #journal-balance:empty { margin: 0; }
+[data-state="error"] { color: #a12126; }
+[data-state="success"] { color: #176446; }
+@media (max-width: 42rem) {
+    .forms, .teams { grid-template-columns: 1fr; }
+    .teams { gap: .35rem; }
+}
