@@ -5,7 +5,7 @@ const byId = (id) => document.getElementById(id);
 const euros = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR" });
 const kickoffFormat = new Intl.DateTimeFormat("en-GB", {
     day: "numeric", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit", timeZoneName: "short",
+    hour: "2-digit", minute: "2-digit",
 });
 const fixtureStates = {
     SCHEDULED: "Scheduled",

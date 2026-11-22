@@ -1,0 +1,93 @@
+openapi: 3.0.3
+info:
+  title: Betledger Bankroll API
+  version: 1.0.0
+  description: Bankroll ledger operations for the static Betledger UI.
+paths:
+  /health:
+    get:
+      operationId: getBankrollHealth
+      summary: Check service and database health
+      responses:
+        '200':
+          description: The service can access its database.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: The database health probe failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /balance:
+    get:
+      operationId: getBalance
+      summary: Read the current bankroll balance
+      responses:
+        '200':
+          description: The sum of the signed ledger entries in cents.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [balance_cents]
+                properties:
+                  balance_cents: {type: integer, format: int64}
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /deposits:
+    post:
+      operationId: createDeposit
+      summary: Record a deposit in the ledger
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount_cents, description]
+              properties:
+                amount_cents: {type: integer, minimum: 1, maximum: 2147483647}
+                description: {type: string, minLength: 1, description: A nonblank deposit description.}
+      responses:
+        '201':
+          description: The deposit was committed to the ledger.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, amount_cents]
+                properties:
+                  id: {type: integer, minimum: 1}
+                  amount_cents: {type: integer, minimum: 1, maximum: 2147483647}
+        '400':
+          description: The body was not a JSON object or the amount or description was invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+components:
+  responses:
+    DatabaseUnavailable:
+      description: Bankroll could not complete the database operation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Health:
+      type: object
+      required: [status, db, version]
+      properties:
+        status: {type: string, enum: [ok, error]}
+        db: {type: string, enum: [ok, unavailable]}
+        version: {type: string}
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: {type: string}

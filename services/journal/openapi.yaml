@@ -1,0 +1,110 @@
+openapi: 3.0.3
+info:
+  title: Betledger Journal API
+  version: 1.0.0
+  description: Imports and lists LaLiga fixtures and results for the static Betledger UI.
+paths:
+  /health:
+    get:
+      operationId: getJournalHealth
+      summary: Check service and database health
+      responses:
+        '200':
+          description: The service can access its database.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: The database health probe failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /matches:
+    get:
+      operationId: listImportedMatches
+      summary: List imported fixtures with the available bankroll balance
+      responses:
+        '200':
+          description: The imported fixtures remain available even if Bankroll cannot be reached.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [matches, balance_cents, bankroll_status]
+                properties:
+                  matches:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Fixture'
+                  balance_cents:
+                    type: integer
+                    format: int64
+                    nullable: true
+                    description: Null if Bankroll is unavailable.
+                  bankroll_status: {type: string, enum: [ok, unavailable]}
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /matches/sync:
+    post:
+      operationId: syncLaLigaMatches
+      summary: Import the LaLiga 2026–27 fixture feed
+      description: Updates existing matches by their provider ID and inserts new matches. No request body is required.
+      responses:
+        '200':
+          description: The source fixtures were processed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [synced]
+                properties:
+                  synced: {type: integer, minimum: 0}
+        '502':
+          description: The upstream feed rejected the request, was unreachable, or returned invalid data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: The feed token is missing or Journal could not access its database.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  responses:
+    DatabaseUnavailable:
+      description: Journal could not complete the database operation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Health:
+      type: object
+      required: [status, db, version]
+      properties:
+        status: {type: string, enum: [ok, error]}
+        db: {type: string, enum: [ok, unavailable]}
+        version: {type: string}
+    Fixture:
+      type: object
+      required: [id, home_team, away_team, kickoff_at, home_goals, away_goals, status, source_status]
+      properties:
+        id: {type: integer, minimum: 1}
+        home_team: {type: string, minLength: 1, maxLength: 120}
+        away_team: {type: string, minLength: 1, maxLength: 120}
+        kickoff_at: {type: string, format: date-time, nullable: true}
+        home_goals: {type: integer, minimum: 0, nullable: true}
+        away_goals: {type: integer, minimum: 0, nullable: true}
+        status: {type: string, enum: [scheduled, finished]}
+        source_status:
+          type: string
+          enum: [SCHEDULED, TIMED, IN_PLAY, PAUSED, EXTRA_TIME, PENALTY_SHOOTOUT, FINISHED, SUSPENDED, POSTPONED, CANCELLED, AWARDED]
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: {type: string}
