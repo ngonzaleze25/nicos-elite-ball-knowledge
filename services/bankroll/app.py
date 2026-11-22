@@ -35,6 +35,17 @@ def create_app():
             flush=True,
         )
         return response
+
+    @app.after_request
+    def add_cors_headers(response):
+        ui_origin = os.environ.get("UI_ORIGIN", "http://127.0.0.1:8080")
+        response.vary.add("Origin")
+        if request.headers.get("Origin") == ui_origin:
+            response.headers["Access-Control-Allow-Origin"] = ui_origin
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+
     @app.get("/health")
     def health():
         version = os.environ.get("APP_VERSION", "dev")
