@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nico's Elite Ball Knowledge</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="config.js" defer></script>
+    <script src="app.js" defer></script>
+</head>
+<body>
+    <header class="masthead">
+        <div class="masthead-inner">
+            <div>
+                <p class="season">LaLiga 2026–27</p>
+                <h1>Nico’s Elite Ball Knowledge</h1>
+            </div>
+            <button type="button" id="refresh">Refresh</button>
+        </div>
+    </header>
+    <main>
+        <noscript><p>This page needs JavaScript to load your balance and fixtures.</p></noscript>
+        <div class="forms">
+            <section class="panel" aria-labelledby="bankroll-title">
+                <h2 id="bankroll-title">Bankroll</h2>
+                <p id="balance" class="balance" role="status">Loading balance…</p>
+                <form id="deposit-form">
+                    <label for="amount">Deposit amount (€)</label>
+                    <input id="amount" name="amount" type="text" inputmode="decimal" placeholder="12.50" required>
+                    <label for="description">Description</label>
+                    <input id="description" name="description" type="text" required>
+                    <button type="submit">Record deposit</button>
+                </form>
+                <p id="deposit-message" class="message" role="status"></p>
+            </section>
+            <section class="panel" aria-labelledby="fixture-title">
+                <h2 id="fixture-title">LaLiga schedule</h2>
+                <p>Sync the latest fixtures, kickoff times, and results.</p>
+                <form id="fixture-form">
+                    <button type="submit">Sync LaLiga fixtures</button>
+                </form>
+                <p id="fixture-message" class="message" role="status"></p>
+                <p class="muted">Football data provided by the <a href="https://www.football-data.org/">Football-Data.org API</a>.</p>
+            </section>
+        </div>
+        <section class="panel journal" aria-labelledby="journal-title">
+            <div class="journal-header">
+                <h2 id="journal-title">Journal</h2>
+                <label for="fixture-filter">Show
+                    <select id="fixture-filter">
+                        <option value="upcoming">Upcoming</option>
+                        <option value="all">All fixtures</option>
+                    </select>
+                </label>
+            </div>
+            <p id="journal-balance" class="muted" role="status"></p>
+            <p id="fixture-status" role="status">Loading fixtures…</p>
+            <div class="table-scroll" id="fixture-table" hidden>
+                <table>
+                    <thead><tr>
+                        <th scope="col">Fixture</th>
+                        <th scope="col">Kickoff (your local time)</th>
+                        <th scope="col">Status</th>
+                    </tr></thead>
+                    <tbody id="fixtures"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

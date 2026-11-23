@@ -35,3 +35,49 @@ Decision: Keep bet365 and bwin odds manually entered and record stakes only with
 Alternatives considered: Automatic bookmaker integration could reduce manual entry, but it would add external dependencies and financial-action handling beyond the intended assignment scope. Live-odds scraping would also require maintenance when bookmaker pages change.
 Consequences: The application remains focused on analysis, bankroll tracking, and explaining decisions. Users must obtain prices and place any actual bets separately, so recorded odds and stakes may differ from what was available or placed with a bookmaker.
 
+## 6. Split Journal and Bankroll into two services
+
+Context: In Assignment 1, Journal and Bankroll ran in the same Flask app and shared one SQLite database. In Assignment 2, each service needs its own database.
+
+Decision: Keep the same two domains. Journal will own matches, imported fixture links, odds, betting decisions, and recorded bets. Bankroll will own the money ledger. When Journal needs the available balance for a stake suggestion, it will ask Bankroll over HTTP.
+
+Alternatives considered: I considered having the browser fetch the balance and pass it to Journal. I chose a direct HTTP call so Journal can get the balance from Bankroll, which owns the money ledger.
+
+Consequences: If Bankroll does not respond before the timeout, Journal will show that the stake suggestion is unavailable. The user can still view matches and odds. Recording a bet and deducting its stake now touch two databases, so the single SQLite transaction from Assignment 1 can no longer cover both writes.
+
+## 7. Data and Migration
+Context: Assignment 1 stored both domains in one SQLite database. The split gives Journal and Bankroll separate SQL Server databases.
+
+Decision: Journal owns matches and Bankroll owns ledger transactions. Each service runs its own numbered SQL files at startup and records which ones ran in schema_migrations.
+Alternatives considered: I considered keeping the first-boot schema setup from Assignment 1. I chose numbered SQL migrations so each service can apply changes in order and preserve existing rows.
+
+Consequences: Recording a bet and deducting its stake now span two databases, so one database transaction can’t protect both writes. If a migration fails, its transaction rolls back. If an already applied migration needs correcting, write a new numbered migration.
+
+## 8. Azure Hosting and Scaling
+Context: The browser needs a public URL, and the two APIs need somewhere to run after deployment.
+
+Decision: Azure Storage hosts the static UI. Bankroll and Journal run in one Container Apps environment on Consumption, each with its own serverless SQL database. GitHub Actions deploys using OIDC.
+
+Alternatives considered: I considered running both APIs on an always-on VM. I chose Container Apps Consumption because the APIs can scale to zero between requests. The databases use the serverless free offer, and static hosting costs depend on storage and traffic.
+
+Consequences: After idle time, a container may need to start and its database may need to resume, so the API retries the database connection with a delay. Each app is limited to one replica while migrations run at startup. At 100× traffic, I would check request latency and database usage, move migrations to a separate deployment step before allowing multiple replicas, and raise the database capacity if measurements show it is the bottleneck.
+
+## 9. Gate deployment on checks for both services
+
+Context: Each service can build successfully on its own while a broken API contract or a change to the call between services still breaks the application.
+
+Decision: Use GitHub Actions to lint, validate the system and OpenAPI documents, test the services, and enforce 70% line coverage separately for each service. Build both images and run the service seam test through Docker Compose with a temporary SQL Server.
+
+Alternatives considered: A stub makes timeout behavior easy to reproduce in a unit test, but it cannot show whether Compose networking, SQL permissions, and both containers work together. Keep a fast unit test and a separate Compose test that stops and restarts Bankroll.
+
+Consequences: CI uses a synthetic fixture and a test deposit. It verifies that Journal keeps showing the fixture while Bankroll is unavailable and that the balance is restored after Bankroll restarts. CI does not call football-data.org or Azure SQL. Azure behavior is checked after deployment.
+
+## 10. Keep fixture sync user-triggered
+
+Context: Kickoff times and results can change, so an automatic refresh could keep the fixture list more current.
+
+Decision: Start a sync only when the user requests it. Journal saves the imported fixtures in its own database, and users can still read them if the provider is unavailable.
+
+Alternatives considered: A scheduled job would automate the refresh, but it would also call the provider and wake Azure SQL while nobody is using the app.
+
+Consequences: Users must sync again to see provider updates. I would revisit scheduling if multiple users needed frequent updates and we could control request limits and the extra cost.

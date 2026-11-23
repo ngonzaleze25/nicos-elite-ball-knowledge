@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=./system.schema.json
+student: ngonzaleze.ieu2024
+prefix: ngonzaleze-ieu2024
+public_url: https://ngonzalezeieu2024ui.z28.web.core.windows.net/
+ui:
+  path: ui
+  storage_account: ngonzalezeieu2024ui
+  calls: [bankroll, journal]
+azure:
+  resource_group: rg-ngonzaleze-ieu2024
+  container_apps_environment: ngonzaleze-ieu2024-env
+  sql_server: ngonzaleze-ieu2024-sql
+  registry: ghcr.io/ngonzaleze25
+services:
+  bankroll:
+    description: Records ledger transactions and exposes the bankroll balance in cents.
+    path: services/bankroll
+    openapi: services/bankroll/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/bankroll/migrations
+    env:
+      PORT:
+        description: HTTP port inside the container.
+        default: 8000
+      APP_VERSION:
+        description: Version reported by the health endpoint.
+        default: dev
+      UI_ORIGIN:
+        description: Exact browser origin permitted by CORS. Set to the Azure website origin in deployment.
+        default: http://127.0.0.1:8080
+      DATABASE_URL:
+        description: SQL connection URL for the dedicated Bankroll user and database.
+        secret: true
+    calls: []
+    azure:
+      container_app: ngonzaleze-ieu2024-bankroll
+      sql_database: ngonzaleze-ieu2024-bankroll-db
+  journal:
+    description: Imports LaLiga fixtures and results from football-data.org and lists them with the Bankroll balance.
+    path: services/journal
+    openapi: services/journal/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/journal/migrations
+    env:
+      PORT:
+        description: HTTP port inside the container. Compose publishes it as 8001 on the host.
+        default: 8000
+      APP_VERSION:
+        description: Version reported by the health endpoint.
+        default: dev
+      UI_ORIGIN:
+        description: Exact browser origin permitted by CORS. Set to the Azure website origin in deployment.
+        default: http://127.0.0.1:8080
+      DATABASE_URL:
+        description: SQL connection URL for the dedicated Journal user and database.
+        secret: true
+      BANKROLL_URL:
+        description: Bankroll base URL. Compose provides the local default. Outside Compose it must be set explicitly for balance lookups.
+        default: http://bankroll:8000
+      FOOTBALL_DATA_API_TOKEN:
+        description: Server-side football-data.org API key required to import LaLiga fixtures.
+        secret: true
+    calls:
+      - service: bankroll
+        url_env: BANKROLL_URL
+        endpoints: [GET /balance]
+        timeout_s: 2
+        on_failure: Journal still lists fixtures and returns a null balance with bankroll_status unavailable.
+    azure:
+      container_app: ngonzaleze-ieu2024-journal
+      sql_database: ngonzaleze-ieu2024-journal-db

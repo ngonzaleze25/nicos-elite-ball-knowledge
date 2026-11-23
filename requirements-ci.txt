@@ -1,0 +1,7 @@
+-r requirements.txt
+-r services/bankroll/requirements.txt
+-r services/journal/requirements.txt
+jsonschema==4.26.0
+openapi-spec-validator==0.7.2
+PyYAML==6.0.3
+ruff==0.14.14

@@ -45,6 +45,52 @@ Synchronisation retrieves LaLiga fixtures and results for the season starting in
 
 Do not commit API credentials. API errors are displayed without removing existing records.
 
+### Fixture sync in the Compose app
+
+Load the local database settings, then enter the football-data.org token into the hidden prompt in the same VS Code zsh terminal:
+
+```zsh
+source "$HOME/.config/betledger/compose.zsh"
+read -rs 'FOOTBALL_DATA_API_TOKEN?Paste the football-data.org token, then press Enter: '
+export FOOTBALL_DATA_API_TOKEN
+docker compose up -d --build
+```
+
+Open http://127.0.0.1:8080 and select **Sync LaLiga fixtures**. Journal uses the feed's fixture ID to update dates, statuses, and results on later syncs. Confirmed kickoffs display in the browser's local timezone. Unconfirmed times show **Kickoff TBC**. Previously imported fixtures remain available if the feed is temporarily down. Keep the token on the Journal service, with Azure deployment using a secret for `FOOTBALL_DATA_API_TOKEN`.
+
+### Assignment 2 CI checks
+
+The CI workflow validates the assignment system schema and both OpenAPI contracts, lints the service code, and enforces at least 70% coverage for each service. To run the Python checks from the repository root:
+
+```sh
+python -m pip install -r requirements-ci.txt
+ruff check services scripts tests/test_service_apis.py tests/test_service_migrations.py
+python scripts/validate_contracts.py
+python -m pytest --cov=services.bankroll --cov=services.journal \
+  tests/test_bankroll_startup.py tests/test_kelly.py tests/test_journal_fixture_feed.py \
+  tests/test_service_apis.py tests/test_service_migrations.py
+python -m coverage report --include='services/bankroll/*' --precision=2 --fail-under=70
+python -m coverage report --include='services/journal/*' --precision=2 --fail-under=70
+```
+
+CI also builds both images and starts a disposable Compose project with SQL Server. Its integration check writes a test deposit and fixture, stops Bankroll to verify that Journal still lists the fixture, and restarts Bankroll to verify recovery. CI uses synthetic fixture data and does not require Azure credentials or a football-data.org token.
+
+### Assignment 2 Azure deployment
+
+The configured public website address is https://ngonzalezeieu2024ui.z28.web.core.windows.net/.
+The deployment workflow runs on pushes to `main` after changes are reviewed in a pull request. It calls the same CI workflow before publishing both images to GitHub Container Registry with their commit SHA. It then signs in through OIDC, updates the two Container Apps, checks that both health endpoints report the deployed SHA, and uploads the static UI with the Azure API URLs in `config.js`.
+
+Initial setup in Azure for Students:
+
+1. Confirm the subscription allows France Central. Register the App, Operational Insights, SQL, Storage and Managed Identity providers. Use resource group `rg-ngonzaleze-ieu2024`.
+2. Create the Standard LRS StorageV2 account `ngonzalezeieu2024ui` and enable its static website with `index.html`.
+3. Create the logical server `ngonzaleze-ieu2024-sql` and two free-offer General Purpose Gen5 serverless databases, `ngonzaleze-ieu2024-bankroll-db` and `ngonzaleze-ieu2024-journal-db`. Use 0.5–1 vCores, locally redundant backups, and AutoPause at the free limit. Allow Azure services through the SQL firewall. Create `bankroll_app` and `journal_app` in their respective databases with `db_ddladmin`, `db_datareader`, and `db_datawriter`.
+4. Create the environment `ngonzaleze-ieu2024-env` with its Log Analytics workspace. Create the `ngonzaleze-ieu2024-bankroll` and `ngonzaleze-ieu2024-journal` apps on Consumption with public ingress and scales of 0–1. The workflow sets the app port to 8000.
+5. Create the user-assigned identity `ngonzaleze-ieu2024-github` with Contributor on the assignment resource group only. Create GitHub OIDC credentials scoped to `ngonzaleze25/nicos-elite-ball-knowledge` on `refs/heads/main`.
+6. In repository Actions settings, add `PREFIX`, `RESOURCE_GROUP`, and `UI_STORAGE` as variables. Add `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `BANKROLL_DB_PASSWORD`, `JOURNAL_DB_PASSWORD`, and `FOOTBALL_DATA_API_TOKEN` as secrets. Use the two contained-user passwords, not the SQL administrator password.
+
+On the first run, GitHub may publish the two GHCR packages as private. If the deployment job reports that they cannot be pulled anonymously, set only the Bankroll and Journal packages to public and rerun the failed job.
+
 ## Using the Application
 
 1. Record your starting bankroll on Home.
