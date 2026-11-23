@@ -1,0 +1,69 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: betledger-azure
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish the service images
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Build and push both images tagged by commit
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          image_prefix="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          for service in bankroll journal; do
+            docker buildx build --platform linux/amd64 --provenance=false --push \
+              --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+              --tag "$image_prefix-$service:$GITHUB_SHA" "services/$service"
+          done
+
+  deploy:
+    name: Deploy and verify Azure
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Sign in to Azure using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy Container Apps and the static UI
+        env:
+          AZURE_CORE_OUTPUT: none
+          PREFIX: ${{ vars.PREFIX }}
+          RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+          UI_STORAGE: ${{ vars.UI_STORAGE }}
+          BANKROLL_DB_PASSWORD: ${{ secrets.BANKROLL_DB_PASSWORD }}
+          JOURNAL_DB_PASSWORD: ${{ secrets.JOURNAL_DB_PASSWORD }}
+          FOOTBALL_DATA_API_TOKEN: ${{ secrets.FOOTBALL_DATA_API_TOKEN }}
+        run: bash scripts/deploy_azure.sh

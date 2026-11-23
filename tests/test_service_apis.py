@@ -6,6 +6,7 @@ import pymssql
 import pytest
 
 from services.bankroll import app as bankroll
+from services.bankroll import database as bankroll_database
 from services.journal import app as journal
 from services.journal import database as journal_database
 
@@ -101,6 +102,15 @@ def test_journal_decodes_database_credentials_and_targets_its_database(monkeypat
     assert settings["password"] == "sample@password"
     assert settings["database"] == "journal"
     assert settings["autocommit"] is False
+
+
+@pytest.mark.parametrize("database", [bankroll_database, journal_database])
+def test_azure_sql_requires_encrypted_connections(database, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "mssql://sample:pass@example.database.windows.net/db")
+    connect = Mock()
+    monkeypatch.setattr(database.pymssql, "connect", connect)
+    database.get_connection()
+    assert connect.call_args.kwargs["encryption"] == "require"
 
 
 @pytest.mark.parametrize("module", [bankroll, journal])

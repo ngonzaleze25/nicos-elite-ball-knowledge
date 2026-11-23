@@ -24,6 +24,7 @@ def get_connection():
         raise ValueError(
             "DATABASE_URL must include a host, username, password, and database."
         )
+    tls_options = {"encryption": "require"} if parsed.hostname.endswith(".database.windows.net") else {}
     return pymssql.connect(
         server=parsed.hostname,
         port=parsed.port or 1433,
@@ -33,6 +34,7 @@ def get_connection():
         login_timeout=5,
         timeout=5,
         autocommit=False,
+        **tls_options,
     )
 
 

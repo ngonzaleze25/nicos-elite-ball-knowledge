@@ -71,3 +71,13 @@ Decision: Use GitHub Actions to lint, validate the system and OpenAPI documents,
 Alternatives considered: A stub makes timeout behavior easy to reproduce in a unit test, but it cannot show whether Compose networking, SQL permissions, and both containers work together. Keep a fast unit test and a separate Compose test that stops and restarts Bankroll.
 
 Consequences: CI uses a synthetic fixture and a test deposit. It verifies that Journal keeps showing the fixture while Bankroll is unavailable and that the balance is restored after Bankroll restarts. CI does not call football-data.org or Azure SQL. Azure behavior is checked after deployment.
+
+## 10. Keep fixture sync user-triggered
+
+Context: Kickoff times and results can change, so an automatic refresh could keep the fixture list more current.
+
+Decision: Start a sync only when the user requests it. Journal saves the imported fixtures in its own database, and users can still read them if the provider is unavailable.
+
+Alternatives considered: A scheduled job would automate the refresh, but it would also call the provider and wake Azure SQL while nobody is using the app.
+
+Consequences: Users must sync again to see provider updates. I would revisit scheduling if multiple users needed frequent updates and we could control request limits and the extra cost.
