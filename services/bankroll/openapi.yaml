@@ -104,6 +104,248 @@ paths:
                 $ref: '#/components/schemas/Error'
         '503':
           $ref: '#/components/responses/DatabaseUnavailable'
+  /bets:
+    get:
+      operationId: listRecordedBets
+      summary: List recorded bets and settlement state
+      responses:
+        '200':
+          description: List recorded bets and settlement state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - bets
+                properties:
+                  bets:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - id
+                      - decision_id
+                      - stake_cents
+                      - decimal_odds
+                      - selection
+                      - status
+                      properties:
+                        id:
+                          type: integer
+                          minimum: 1
+                          maximum: 2147483647
+                        decision_id:
+                          type: integer
+                          minimum: 1
+                          maximum: 2147483647
+                        stake_cents:
+                          type: integer
+                          minimum: 1
+                          maximum: 1000
+                        decimal_odds:
+                          type: string
+                          description: Decimal odds encoded as a string to preserve
+                            precision.
+                        selection:
+                          type: string
+                          enum:
+                          - home
+                          - draw
+                          - away
+                        status:
+                          type: string
+                          enum:
+                          - open
+                          - won
+                          - lost
+                          - void
+        '503':
+          description: A required service or database is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+    post:
+      operationId: recordBet
+      summary: Record a bet and debit its stake atomically
+      responses:
+        '201':
+          description: Record a bet and debit its stake atomically.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - id
+                properties:
+                  id:
+                    type: integer
+                    minimum: 1
+                    maximum: 2147483647
+        '400':
+          description: Invalid JSON input.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Fixture or saved record was not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '409':
+          description: The current state does not allow this operation.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '503':
+          description: A required service or database is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '200':
+          description: The same decision and stake were already recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - id
+                properties:
+                  id:
+                    type: integer
+                    minimum: 1
+                    maximum: 2147483647
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - decision_id
+              - stake_cents
+              properties:
+                decision_id:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+                stake_cents:
+                  type: integer
+                  minimum: 1
+                  maximum: 1000
+  /bets/{bet_id}/settlement:
+    post:
+      operationId: settleBet
+      summary: Settle a recorded bet from the final score or void it
+      responses:
+        '200':
+          description: Settle a recorded bet from the final score or void it.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - open
+                    - won
+                    - lost
+                    - void
+        '400':
+          description: Invalid JSON input.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Fixture or saved record was not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '409':
+          description: The current state does not allow this operation.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '503':
+          description: A required service or database is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+      parameters:
+      - name: bet_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - void
+              properties:
+                void:
+                  type: boolean
 components:
   responses:
     DatabaseUnavailable:

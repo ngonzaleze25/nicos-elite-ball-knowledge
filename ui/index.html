@@ -65,6 +65,48 @@
                 </label>
             </div>
             <p id="journal-balance" class="muted" role="status"></p>
+            <section aria-labelledby="betting-title">
+                <h3 id="betting-title">Betting journal</h3>
+                <label for="betting-fixture">Fixture</label>
+                <select id="betting-fixture" disabled>
+                    <option value="">Choose a fixture</option>
+                </select>
+                <p id="betting-message" class="message" role="status"></p>
+                <div id="betting-detail" hidden>
+                    <p id="betting-estimate"></p>
+                    <h4>Bookmaker odds</h4>
+                    <ul id="betting-odds"></ul>
+                    <form id="odds-form">
+                        <label for="odds-bookmaker">Bookmaker</label>
+                        <select id="odds-bookmaker" name="bookmaker">
+                            <option>bet365</option><option>bwin</option>
+                        </select>
+                        <label for="home-odds">Home odds</label>
+                        <input id="home-odds" name="home_odds" type="number" min="1.0001" max="10000" step="any" required>
+                        <label for="draw-odds">Draw odds</label>
+                        <input id="draw-odds" name="draw_odds" type="number" min="1.0001" max="10000" step="any" required>
+                        <label for="away-odds">Away odds</label>
+                        <input id="away-odds" name="away_odds" type="number" min="1.0001" max="10000" step="any" required>
+                        <button type="submit">Save odds</button>
+                    </form>
+                    <h4>Bet decisions</h4>
+                    <form id="decision-form">
+                        <label for="decision-bookmaker">Bookmaker</label>
+                        <select id="decision-bookmaker" name="bookmaker">
+                            <option>bet365</option><option>bwin</option>
+                        </select>
+                        <label for="decision-selection">Outcome</label>
+                        <select id="decision-selection" name="selection">
+                            <option value="home">Home</option>
+                            <option value="draw">Draw</option>
+                            <option value="away">Away</option>
+                        </select>
+                        <button type="submit">Save decision</button>
+                    </form>
+                    <p id="bets-status" class="message"></p>
+                    <ul id="betting-decisions"></ul>
+                </div>
+            </section>
             <p id="fixture-status" role="status">Loading fixtures…</p>
             <div class="table-scroll" id="fixture-table" hidden>
                 <table>

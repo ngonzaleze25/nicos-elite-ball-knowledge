@@ -39,6 +39,7 @@ services:
         condition: service_completed_successfully
     environment:
       DATABASE_URL: "mssql://bankroll_app:${BANKROLL_DB_PASSWORD:?Set BANKROLL_DB_PASSWORD}@sqlserver:1433/bankroll"
+      JOURNAL_URL: "http://journal:8000"
     ports:
       - "127.0.0.1:8000:8000"
   journal:

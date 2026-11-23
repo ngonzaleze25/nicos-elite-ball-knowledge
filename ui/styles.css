@@ -45,3 +45,8 @@ th { background: #f1f4f8; }
 @media (max-width: 42rem) {
     .forms { grid-template-columns: 1fr; }
 }
+#betting-fixture { max-width: 100%; }
+#betting-detail { margin-block: 1rem; max-width: 38rem; }
+#betting-decisions { padding-inline-start: 1.25rem; }
+#betting-decisions li { margin-block: 1rem; }
+#betting-decisions button { margin-inline-end: .5rem; margin-bottom: .5rem; }

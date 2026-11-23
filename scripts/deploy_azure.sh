@@ -68,6 +68,8 @@ deploy_service() {
     secrets+=("football-data-api-token=$FOOTBALL_DATA_API_TOKEN")
     settings+=("FOOTBALL_DATA_API_TOKEN=secretref:football-data-api-token"
       "BANKROLL_URL=$bankroll_url")
+  else
+    settings+=("JOURNAL_URL=$journal_url")
   fi
 
   az containerapp secret set --resource-group "$RESOURCE_GROUP" --name "$app" \

@@ -7,6 +7,7 @@ from contextlib import closing
 from flask import Flask,g,request
 from pymssql import Error
 
+from services.journal.betting import betting
 from services.journal.database import check_database_health, connect_with_retry, get_connection
 from services.journal.fixture_feed import FixtureFeedError, MissingFixtureToken, fetch_laliga_fixtures
 from services.journal.migrate import run_migrations
@@ -54,6 +55,7 @@ def save_imported_fixtures(fixtures):
 
 def create_app():
     app = Flask(__name__)
+    app.register_blueprint(betting)
 
     connection = connect_with_retry()
     try:

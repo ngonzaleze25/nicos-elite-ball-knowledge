@@ -106,6 +106,7 @@ async function loadFixtures() {
         const data = await requestJson(config?.journalUrl, "/matches");
         fixtures = data.matches;
         renderFixtures();
+        renderBettingFixtures();
         message(journalBalance, data.bankroll_status === "ok"
             ? "Balance reported to Journal: " + euros.format(data.balance_cents / 100)
             : "Bankroll is unavailable. Journal fixtures are still available.");
@@ -188,4 +189,167 @@ bindForm("deposit-form", "deposit-message", config?.bankrollUrl, "/deposits", de
 bindForm("fixture-form", "fixture-message", config?.journalUrl, "/matches/sync", () => ({}), "Fixtures synced.", 25000);
 byId("fixture-filter").addEventListener("change", renderFixtures);
 byId("refresh").addEventListener("click", refresh);
+const bettingFixture = byId("betting-fixture");
+const bettingMessage = byId("betting-message");
+const bettingDetail = byId("betting-detail");
+const percent = new Intl.NumberFormat("en-IE", { style: "percent", maximumFractionDigits: 2 });
+
+function renderBettingFixtures() {
+    const selected = bettingFixture.value;
+    const options = fixtures.map((fixture) => {
+        const option = document.createElement("option");
+        option.value = fixture.id;
+        const kickoff = fixture.kickoff_at && !unconfirmedKickoff.has(fixture.source_status)
+            ? " · " + kickoffFormat.format(new Date(fixture.kickoff_at)) : "";
+        option.textContent = fixture.home_team + " vs " + fixture.away_team + kickoff;
+        return option;
+    });
+    bettingFixture.replaceChildren(new Option("Choose a fixture", ""), ...options);
+    bettingFixture.value = options.some((option) => option.value === selected) ? selected : "";
+    bettingFixture.disabled = options.length === 0;
+    bettingDetail.hidden = !bettingFixture.value;
+}
+
+function actionButton(text, action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = text;
+    button.addEventListener("click", () => performBettingAction(button, action));
+    return button;
+}
+
+async function performBettingAction(button, action) {
+    const fixture = bettingFixture.value;
+    button.disabled = true;
+    message(bettingMessage, "Working…");
+    try {
+        const confirmation = await action(fixture);
+        await refresh();
+        if (bettingFixture.value === fixture) {
+            await loadBettingDetail();
+            if (!bettingDetail.hidden) message(bettingMessage, confirmation, "success");
+        }
+    } catch (error) {
+        if (bettingFixture.value === fixture) message(bettingMessage, error.message, "error");
+    } finally {
+        button.disabled = false;
+    }
+}
+
+function showDecision(decision, bet, bankrollAvailable) {
+    const row = document.createElement("li");
+    const detail = document.createElement("p");
+    const implied = 1 / Number(decision.decimal_odds);
+    const margin = decision.model_probability - implied;
+    detail.textContent = `${decision.bookmaker} · ${decision.selection} at ${decision.decimal_odds} · Estimate ${percent.format(decision.model_probability)} · Implied ${percent.format(implied)} · ${margin > 0 ? "Possible value" : "No value"}`;
+    row.append(detail);
+    const quote = document.createElement("button");
+    quote.type = "button";
+    quote.textContent = "Calculate Kelly";
+    quote.addEventListener("click", () => {
+        byId("kelly-odds").value = decision.decimal_odds;
+        byId("kelly-probability").value = decision.model_probability * 100;
+        kellyForm.scrollIntoView({ block: "center" });
+        kellyForm.requestSubmit();
+    });
+    row.append(quote);
+    if (!bankrollAvailable) return row;
+
+    if (!bet) {
+        const form = document.createElement("form");
+        const label = document.createElement("label");
+        const input = document.createElement("input");
+        input.type = "number";
+        input.min = "0.01";
+        input.max = "10";
+        input.step = "0.01";
+        input.required = true;
+        label.textContent = "Stake (€)";
+        label.append(input);
+        const submit = document.createElement("button");
+        submit.textContent = "Record bet";
+        form.append(label, submit);
+        form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            performBettingAction(submit, async () => {
+                await requestJson(config?.bankrollUrl, "/bets", {
+                    decision_id: decision.id,
+                    stake_cents: Math.round(Number(input.value) * 100),
+                });
+                return "Bet recorded.";
+            });
+        });
+        row.append(form);
+        return row;
+    }
+
+    const state = document.createElement("p");
+    state.textContent = `${euros.format(bet.stake_cents / 100)} · ${bet.status}`;
+    row.append(state);
+    if (bet.status === "open") {
+        for (const [text, isVoid] of [["Settle from final score", false], ["Void bet", true]]) {
+            row.append(actionButton(text, async () => {
+                const result = await requestJson(config?.bankrollUrl, `/bets/${bet.id}/settlement`, { void: isVoid });
+                return `Bet settled as ${result.status}.`;
+            }));
+        }
+    }
+    return row;
+}
+
+let bettingRequest = 0;
+async function loadBettingDetail() {
+    const requestId = ++bettingRequest;
+    const fixture = bettingFixture.value;
+    bettingDetail.hidden = true;
+    message(bettingMessage, fixture ? "Loading fixture details…" : "");
+    if (!fixture) return;
+    try {
+        const [data, bankroll] = await Promise.all([
+            requestJson(config?.journalUrl, `/matches/${fixture}/betting`),
+            requestJson(config?.bankrollUrl, "/bets").catch(() => null),
+        ]);
+        if (requestId !== bettingRequest || bettingFixture.value !== fixture) return;
+
+        const probabilities = data.estimate?.probabilities;
+        message(byId("betting-estimate"), probabilities
+            ? Object.entries(probabilities).map(([outcome, probability]) =>
+                `${outcome}: ${percent.format(probability)}`).join(" · ")
+            : data.estimate_message);
+        const odds = data.odds.map((item) => {
+            const row = document.createElement("li");
+            row.textContent = `${item.bookmaker} · Home ${item.home_odds} · Draw ${item.draw_odds} · Away ${item.away_odds}`;
+            return row;
+        });
+        byId("betting-odds").replaceChildren(...odds);
+        const betsByDecision = new Map((bankroll?.bets || []).map((bet) => [bet.decision_id, bet]));
+        byId("betting-decisions").replaceChildren(...data.decisions.map((decision) =>
+            showDecision(decision, betsByDecision.get(decision.id), Boolean(bankroll))));
+        message(byId("bets-status"), bankroll ? "" : "Bankroll is unavailable. Saved odds and decisions are still visible.");
+        bettingDetail.hidden = false;
+        message(bettingMessage, "");
+    } catch (error) {
+        if (requestId === bettingRequest) message(bettingMessage, error.message, "error");
+    }
+}
+
+bettingFixture.addEventListener("change", loadBettingDetail);
+for (const [formId, endpoint, confirmation] of [
+    ["odds-form", "odds", "Bookmaker odds saved."],
+    ["decision-form", "decisions", "Decision saved."],
+]) {
+    const form = byId(formId);
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const fields = Object.fromEntries(new FormData(form));
+        for (const name of ["home_odds", "draw_odds", "away_odds"]) {
+            if (name in fields) fields[name] = Number(fields[name]);
+        }
+        performBettingAction(form.querySelector("button"), async (fixture) => {
+            await requestJson(config?.journalUrl, `/matches/${fixture}/${endpoint}`, fields);
+            return confirmation;
+        });
+    });
+}
+
 refresh();

@@ -73,6 +73,418 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /matches/{match_id}/betting:
+    get:
+      operationId: getFixtureBetting
+      summary: Get saved odds, decisions and the Poisson estimate
+      responses:
+        '200':
+          description: Get saved odds, decisions and the Poisson estimate.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - odds
+                - decisions
+                - estimate
+                - estimate_message
+                properties:
+                  odds:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - bookmaker
+                      - home_odds
+                      - draw_odds
+                      - away_odds
+                      properties:
+                        bookmaker:
+                          type: string
+                          enum:
+                          - bet365
+                          - bwin
+                        home_odds:
+                          type: string
+                          description: Decimal odds encoded as a string to preserve
+                            precision.
+                        draw_odds:
+                          type: string
+                          description: Decimal odds encoded as a string to preserve
+                            precision.
+                        away_odds:
+                          type: string
+                          description: Decimal odds encoded as a string to preserve
+                            precision.
+                  decisions:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - id
+                      - bookmaker
+                      - selection
+                      - decimal_odds
+                      - model_probability
+                      properties:
+                        id:
+                          type: integer
+                          minimum: 1
+                          maximum: 2147483647
+                        bookmaker:
+                          type: string
+                          enum:
+                          - bet365
+                          - bwin
+                        selection:
+                          type: string
+                          enum:
+                          - home
+                          - draw
+                          - away
+                        decimal_odds:
+                          type: string
+                          description: Decimal odds encoded as a string to preserve
+                            precision.
+                        model_probability:
+                          type: number
+                          minimum: 0
+                          maximum: 1
+                  estimate:
+                    type: object
+                    required:
+                    - home_expected_goals
+                    - away_expected_goals
+                    - home_sample_size
+                    - away_sample_size
+                    - probabilities
+                    properties:
+                      home_expected_goals:
+                        type: number
+                      away_expected_goals:
+                        type: number
+                      home_sample_size:
+                        type: integer
+                      away_sample_size:
+                        type: integer
+                      probabilities:
+                        type: object
+                        required:
+                        - home
+                        - draw
+                        - away
+                        properties:
+                          home:
+                            type: number
+                            minimum: 0
+                            maximum: 1
+                          draw:
+                            type: number
+                            minimum: 0
+                            maximum: 1
+                          away:
+                            type: number
+                            minimum: 0
+                            maximum: 1
+                    nullable: true
+                  estimate_message:
+                    type: string
+                    nullable: true
+        '404':
+          description: Fixture or saved record was not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '503':
+          description: A required service or database is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+      parameters:
+      - name: match_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+  /matches/{match_id}/odds:
+    post:
+      operationId: saveFixtureOdds
+      summary: Save manually entered decimal odds for a bookmaker
+      responses:
+        '200':
+          description: Save manually entered decimal odds for a bookmaker.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - bookmaker
+                properties:
+                  bookmaker:
+                    type: string
+                    enum:
+                    - bet365
+                    - bwin
+        '400':
+          description: Invalid JSON input.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Fixture or saved record was not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '503':
+          description: A required service or database is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+      parameters:
+      - name: match_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - bookmaker
+              - home_odds
+              - draw_odds
+              - away_odds
+              properties:
+                bookmaker:
+                  type: string
+                  enum:
+                  - bet365
+                  - bwin
+                home_odds:
+                  type: number
+                  minimum: 1.0001
+                  maximum: 10000
+                draw_odds:
+                  type: number
+                  minimum: 1.0001
+                  maximum: 10000
+                away_odds:
+                  type: number
+                  minimum: 1.0001
+                  maximum: 10000
+  /matches/{match_id}/decisions:
+    post:
+      operationId: saveBetDecision
+      summary: Save an outcome using recorded odds and the Poisson probability
+      responses:
+        '201':
+          description: Save an outcome using recorded odds and the Poisson probability.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - id
+                properties:
+                  id:
+                    type: integer
+                    minimum: 1
+                    maximum: 2147483647
+        '400':
+          description: Invalid JSON input.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Fixture or saved record was not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '409':
+          description: The current state does not allow this operation.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '503':
+          description: A required service or database is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+      parameters:
+      - name: match_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - bookmaker
+              - selection
+              properties:
+                bookmaker:
+                  type: string
+                  enum:
+                  - bet365
+                  - bwin
+                selection:
+                  type: string
+                  enum:
+                  - home
+                  - draw
+                  - away
+  /decisions/{decision_id}:
+    get:
+      operationId: readBetDecision
+      summary: Read saved odds, selection and the fixture result
+      responses:
+        '200':
+          description: Read saved odds, selection and the fixture result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - id
+                - match_id
+                - selection
+                - decimal_odds
+                - home_team
+                - away_team
+                - match_status
+                - home_goals
+                - away_goals
+                properties:
+                  id:
+                    type: integer
+                    minimum: 1
+                    maximum: 2147483647
+                  match_id:
+                    type: integer
+                    minimum: 1
+                    maximum: 2147483647
+                  selection:
+                    type: string
+                    enum:
+                    - home
+                    - draw
+                    - away
+                  decimal_odds:
+                    type: string
+                    description: Decimal odds encoded as a string to preserve precision.
+                  home_team:
+                    type: string
+                  away_team:
+                    type: string
+                  match_status:
+                    type: string
+                    enum:
+                    - scheduled
+                    - finished
+                  home_goals:
+                    type: integer
+                    nullable: true
+                  away_goals:
+                    type: integer
+                    nullable: true
+        '404':
+          description: Fixture or saved record was not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+        '503':
+          description: A required service or database is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - error
+                properties:
+                  error:
+                    type: string
+      parameters:
+      - name: decision_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
 components:
   responses:
     DatabaseUnavailable:

@@ -39,19 +39,19 @@ Consequences: The application remains focused on analysis, bankroll tracking, an
 
 Context: In Assignment 1, Journal and Bankroll ran in the same Flask app and shared one SQLite database. In Assignment 2, each service needs its own database.
 
-Decision: Keep the same two domains. Journal will own matches, imported fixture links, odds, betting decisions, and recorded bets. Bankroll will own the money ledger. When Journal needs the available balance for a stake suggestion, it will ask Bankroll over HTTP.
+Decision: Journal owns imported fixtures, odds, and betting decisions. Bankroll owns the ledger and recorded bets so a stake or settlement can update both in one local transaction. Journal calls Bankroll for the balance, and Bankroll calls Journal for the saved decision and final score. The main domain split follows ADR-2, with recorded bets moved to the ledger owner.
 
 Alternatives considered: I considered having the browser fetch the balance and pass it to Journal. I chose a direct HTTP call so Journal can get the balance from Bankroll, which owns the money ledger.
 
-Consequences: If Bankroll does not respond before the timeout, Journal will show that the stake suggestion is unavailable. The user can still view matches and odds. Recording a bet and deducting its stake now touch two databases, so the single SQLite transaction from Assignment 1 can no longer cover both writes.
+Consequences: If Bankroll times out, Journal still shows fixtures and odds with an unavailable balance. If Journal times out, Bankroll still shows its balance and recorded bets, but it cannot validate a new decision or settle from a final score.
 
 ## 7. Data and Migration
 Context: Assignment 1 stored both domains in one SQLite database. The split gives Journal and Bankroll separate SQL Server databases.
 
-Decision: Journal owns matches and Bankroll owns ledger transactions. Each service runs its own numbered SQL files at startup and records which ones ran in schema_migrations.
+Decision: Each service runs its own numbered SQL files at startup and records which ones ran in schema_migrations. Local and Azure SQL databases start with those migrations, and Journal reloads fixture data from the provider. The original SQLite database is retained for the legacy app.
 Alternatives considered: I considered keeping the first-boot schema setup from Assignment 1. I chose numbered SQL migrations so each service can apply changes in order and preserve existing rows.
 
-Consequences: Recording a bet and deducting its stake now span two databases, so one database transaction can’t protect both writes. If a migration fails, its transaction rolls back. If an already applied migration needs correcting, write a new numbered migration.
+Consequences: Bankroll stores the decision ID without a cross-database foreign key. It checks Journal before recording a stake, keeps the saved odds, and uses a unique constraint to prevent repeat debits. A failed migration rolls back its transaction. If an already applied migration needs correcting, deploy a new numbered migration. Use Azure SQL point-in-time restore if a migration damages data and verify the restored database before resuming writes.
 
 ## 8. Azure Hosting and Scaling
 Context: The browser needs a public URL, and the two APIs need somewhere to run after deployment.

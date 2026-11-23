@@ -3,7 +3,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py database.py fixture_feed.py migrate.py /app/services/journal/
+COPY app.py database.py fixture_feed.py migrate.py betting.py probability.py /app/services/journal/
 COPY migrations/ /app/services/journal/migrations/
 
 RUN useradd --system --no-create-home appuser
