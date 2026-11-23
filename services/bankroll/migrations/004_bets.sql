@@ -5,8 +5,8 @@ CREATE TABLE dbo.bets (
     decimal_odds DECIMAL(12, 4) NOT NULL CHECK (decimal_odds > 1),
     selection VARCHAR(4) NOT NULL CHECK (selection IN ('home', 'draw', 'away')),
     status VARCHAR(4) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'won', 'lost', 'void')),
-    stake_transaction_id INT NOT NULL UNIQUE REFERENCES dbo.bankroll_transactions(id),
-    settlement_transaction_id INT NULL REFERENCES dbo.bankroll_transactions(id),
+    stake_transaction_id INT NOT NULL UNIQUE CHECK (stake_transaction_id > 0),
+    settlement_transaction_id INT NULL CHECK (settlement_transaction_id > 0),
     created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     settled_at DATETIME2 NULL
 );

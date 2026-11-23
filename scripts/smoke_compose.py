@@ -126,6 +126,11 @@ def main():
         assert status == 200 and degraded["matches"] == healthy["matches"], degraded
         assert degraded["bankroll_status"] == "unavailable"
         assert degraded["balance_cents"] is None
+        print("Journal during Bankroll stop (HTTP 200):", json.dumps({
+            "bankroll_status": degraded["bankroll_status"],
+            "balance_cents": degraded["balance_cents"],
+            "fixture_count": len(degraded["matches"]),
+        }))
     finally:
         compose("start", "bankroll")
     wait_for_health(origin("bankroll", 8000))
