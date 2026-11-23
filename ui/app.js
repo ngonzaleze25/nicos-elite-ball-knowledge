@@ -157,6 +157,33 @@ function bindForm(formId, messageId, baseUrl, path, payload, successMessage, tim
     });
 }
 
+const kellyForm = byId("kelly-form");
+kellyForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = kellyForm.querySelector("button");
+    const output = byId("kelly-result");
+    const fields = new FormData(kellyForm);
+    button.disabled = true;
+    message(output, "Calculating…");
+
+    try {
+        const data = await requestJson(config?.bankrollUrl, "/kelly", {
+            decimal_odds: Number(fields.get("odds")),
+            probability: Number(fields.get("probability")) / 100,
+        });
+        const suggested = euros.format(data.suggested_stake_cents / 100);
+        const full = euros.format(data.full_kelly_cents / 100);
+        message(output, `Suggested stake: ${suggested} (full Kelly: ${full}).`, "success");
+    } catch (error) {
+        const text = error.message === "Could not confirm the save. Refresh before trying again."
+            ? "The calculator could not reach Bankroll. Try again shortly."
+            : error.message;
+        message(output, text, "error");
+    } finally {
+        button.disabled = false;
+    }
+});
+
 bindForm("deposit-form", "deposit-message", config?.bankrollUrl, "/deposits", depositPayload, "Deposit recorded.");
 bindForm("fixture-form", "fixture-message", config?.journalUrl, "/matches/sync", () => ({}), "Fixtures synced.", 25000);
 byId("fixture-filter").addEventListener("change", renderFixtures);

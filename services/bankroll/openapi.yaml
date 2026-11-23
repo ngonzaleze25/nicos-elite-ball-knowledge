@@ -70,6 +70,40 @@ paths:
                 $ref: '#/components/schemas/Error'
         '503':
           $ref: '#/components/responses/DatabaseUnavailable'
+  /kelly:
+    post:
+      operationId: suggestKellyStake
+      summary: Calculate a stake suggestion without changing the ledger
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decimal_odds, probability]
+              properties:
+                decimal_odds: {type: number, minimum: 1, exclusiveMinimum: true}
+                probability: {type: number, minimum: 0, maximum: 1}
+      responses:
+        '200':
+          description: Full Kelly and quarter-Kelly capped at EUR 10, in cents.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [balance_cents, full_kelly_cents, suggested_stake_cents]
+                properties:
+                  balance_cents: {type: integer, format: int64}
+                  full_kelly_cents: {type: integer, minimum: 0}
+                  suggested_stake_cents: {type: integer, minimum: 0, maximum: 1000}
+        '400':
+          description: The JSON body, odds, or probability was invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
 components:
   responses:
     DatabaseUnavailable:
