@@ -32,7 +32,15 @@ services:
       DATABASE_URL:
         description: SQL connection URL for the dedicated Bankroll user and database.
         secret: true
-    calls: []
+      JOURNAL_URL:
+        description: Journal base URL used to validate saved decisions and read final scores.
+        default: http://journal:8000
+    calls:
+      - service: journal
+        url_env: JOURNAL_URL
+        endpoints: ["GET /decisions/{decision_id}"]
+        timeout_s: 2
+        on_failure: Recording or settling a bet returns an error without changing the ledger.
     azure:
       container_app: ngonzaleze-ieu2024-bankroll
       sql_database: ngonzaleze-ieu2024-bankroll-db

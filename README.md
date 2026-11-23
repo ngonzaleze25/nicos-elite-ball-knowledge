@@ -3,60 +3,34 @@
 ## Purpose
 A single-user Flask application for recording and analysing betting decisions for the 2026–27 LaLiga season. It retrieves fixtures and results from football-data.org, accepts manually entered bet365 and bwin decimal odds, and calculates simple Poisson probabilities and Kelly stake suggestions.
 
-## Local Setup
-Use Python 3.12. From the repository directory:
+## Run Assignment 2 locally
+
+Install Docker Desktop and start it. Enable x86/AMD64 emulation on Apple Silicon for the SQL Server image. From a clean clone, use Python 3.12 for tests and run the following in Bash or zsh from the repository root. The generated passwords are for a fresh local volume. Keep the same values when reusing that volume.
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-python app.py
+export MSSQL_SA_PASSWORD="Aa9$(openssl rand -hex 16)"
+export BANKROLL_DB_PASSWORD="Aa9$(openssl rand -hex 16)"
+export JOURNAL_DB_PASSWORD="Aa9$(openssl rand -hex 16)"
+docker compose up --build
 ```
 
-Open http://127.0.0.1:5000.
+Open [the local UI](http://127.0.0.1:8080). Stop the stack with `docker compose stop` to keep its dataset. The UI uses Bankroll on port 8000 and Journal on port 8001. A local user can also load these three settings from a private file outside the repository.
 
-If that port is occupied: PORT=5050 python app.py
-Then open http://127.0.0.1:5050.
-The application runs as one Flask process, binds to 0.0.0.0, and creates its database tables automatically at startup.
+### Run a single service
 
-## Configuration and Storage
-Configuration uses environment variables:
-PORT: server port; default 5000.
-DATA_DIR: database directory; default data inside the project.
-MAX_STAKE_CENTS: maximum stake in integer cents; default 1000 (€10).
-FOOTBALL_DATA_API_TOKEN: optional token required for API synchronisation.
-FLASK_DEBUG: default 0; keep disabled for the normal single-process startup.
+With the same password settings, run `docker compose up --build bankroll` or `docker compose up --build journal`. Compose starts SQL Server and runs the database initializer automatically. Check Bankroll at `http://127.0.0.1:8000/health` or Journal at `http://127.0.0.1:8001/health`. Journal can still return its fixtures when Bankroll is offline. Bankroll can still read its balance when Journal is offline.
 
-The SQLite file is DATA_DIR/betledger.sqlite3. With default settings, it is data/betledger.sqlite3.
-Money is stored as integer cents. Dates are stored as ISO timestamps; the interface displays kickoff times in Madrid time.
-The application starts without an API token. Saved fixtures, journal records, and bankroll operations remain available without API access
+### Fixture sync
 
-## API Synchronisation
-Obtain a token from https://www.football-data.org/.
-In a macOS zsh terminal, configure it without displaying it:
-```bash
-read -rs 'FOOTBALL_DATA_API_TOKEN?Paste your API token, then press Enter: '
-export FOOTBALL_DATA_API_TOKEN
-```
-
-Start the application from the same terminal. On Matches, press Sync fixtures and results.
-
-Synchronisation retrieves LaLiga fixtures and results for the season starting in 2026. Repeated imports update existing API-linked matches instead of creating duplicates. Synchronisation is user-triggered and does not run during application startup.
-
-Do not commit API credentials. API errors are displayed without removing existing records.
-
-### Fixture sync in the Compose app
-
-Load the local database settings, then enter the football-data.org token into the hidden prompt in the same VS Code zsh terminal:
+A [football-data.org](https://www.football-data.org/) token is needed for syncing. Enter it in the terminal that starts Compose. In zsh:
 
 ```zsh
-source "$HOME/.config/betledger/compose.zsh"
-read -rs 'FOOTBALL_DATA_API_TOKEN?Paste the football-data.org token, then press Enter: '
+read -rs 'FOOTBALL_DATA_API_TOKEN?Football-data.org token: '
 export FOOTBALL_DATA_API_TOKEN
 docker compose up -d --build
 ```
 
-Open http://127.0.0.1:8080 and select **Sync LaLiga fixtures**. Journal uses the feed's fixture ID to update dates, statuses, and results on later syncs. Confirmed kickoffs display in the browser's local timezone. Unconfirmed times show **Kickoff TBC**. Previously imported fixtures remain available if the feed is temporarily down. Keep the token on the Journal service, with Azure deployment using a secret for `FOOTBALL_DATA_API_TOKEN`.
+Select **Sync LaLiga fixtures** in the UI. Sync updates the stored fixtures and scores in place using provider IDs. Confirmed kickoffs display in the browser's current time zone. The app marks unconfirmed kickoffs as **Kickoff TBC**.
 
 ### Assignment 2 CI checks
 
@@ -73,11 +47,11 @@ python -m coverage report --include='services/bankroll/*' --precision=2 --fail-u
 python -m coverage report --include='services/journal/*' --precision=2 --fail-under=70
 ```
 
-CI also builds both images and starts a disposable Compose project with SQL Server. Its integration check writes a test deposit and fixture, stops Bankroll to verify that Journal still lists the fixture, and restarts Bankroll to verify recovery. CI uses synthetic fixture data and does not require Azure credentials or a football-data.org token.
+CI builds both images and starts a disposable Compose project with SQL Server. It verifies a deposit, fixture lookup, Bankroll outage and recovery, saved odds and decisions, and final-score settlement without a duplicate stake debit. CI uses synthetic fixture data and does not require Azure credentials or a football-data.org token.
 
 ### Assignment 2 Azure deployment
 
-The configured public website address is https://ngonzalezeieu2024ui.z28.web.core.windows.net/.
+The public website is [Nico’s Elite Ball Knowledge](https://ngonzalezeieu2024ui.z28.web.core.windows.net/).
 The deployment workflow runs on pushes to `main` after changes are reviewed in a pull request. It calls the same CI workflow before publishing both images to GitHub Container Registry with their commit SHA. It then signs in through OIDC, updates the two Container Apps, checks that both health endpoints report the deployed SHA, and uploads the static UI with the Azure API URLs in `config.js`.
 
 Initial setup in Azure for Students:
@@ -91,28 +65,21 @@ Initial setup in Azure for Students:
 
 On the first run, GitHub may publish the two GHCR packages as private. If the deployment job reports that they cannot be pulled anonymously, set only the Bankroll and Journal packages to public and rerun the failed job.
 
-## Using the Application
+## Using the split app
 
-1. Record your starting bankroll on Home.
-2. Synchronise fixtures and results on Matches.
-3. Use Upcoming, team search, and the 7-, 14-, or 30-day window to find a fixture.
-4. Expand the match and enter decimal odds for bet365 or bwin.
-5. Review the Poisson estimates.
-6. Choose a bookmaker and Home, Draw, or Away, then save the decision.
-7. Record the actual stake, subject to your available balance and configured limit.
-8. After the final score is available, settle the bet on Home. A void action refunds the stake.
+1. Record a test deposit in **Bankroll** and sync the LaLiga schedule.
+2. In **Betting journal**, choose a fixture and save decimal odds for bet365 or bwin.
+3. Review the home, draw and away estimates. Save a decision for a bookmaker and outcome.
+4. Use **Calculate Kelly** on the decision to send its saved odds and probability to the Bankroll calculator.
+5. Record a simulated stake. Once the imported final score is available, settle it from the score, or void the record to refund the stake.
 
-My bets shows fixtures with recorded bets, placing open bets first. History shows past fixtures and results. Saving match forms preserves the active match and filters.
+The site is a single-user classroom demo with a shared public dataset. Use sample data. The app records journal entries and does not connect to bookmaker accounts.
 
-The Home reset button sets the available balance to zero by recording a withdrawal. It retains transaction history and open bets. Later payouts or refunds can increase the balance again.
+## Backend feature domains
 
-## Backend Feature Domains
+Journal owns matches, manually entered odds and saved decisions. It imports the schedule and score updates, estimates probabilities, and looks up the balance through Bankroll's HTTP API. Bankroll owns the ledger and recorded bets so stake and settlement transactions commit atomically. It validates the decision and retrieves the fixture result over HTTP before changing the ledger. The bet references the Journal decision with a plain ID.
 
-Bet Decision Journal - journal/:
-It stores matches, API import mappings, bookmakers odds, decisions, and bets in SQLite. It also handles fixture synchronisation, probability estimates, odds comparison, and bet settlement.
-
-Bankroll and Risk - bankroll/:
-Maintains the transaction ledger, available balance, stake validation, open exposure, and Kelly calculations. Both domains run in the same process and share the SQLite connection provided by database.py. They are organised into separate modules but remain coupled: journal operations call bankroll helpers, exposure queries read bets, and bets reference ledger transactions. Recording a stake and settling a bet each update the bet and ledger together in one database transaction.
+The original Assignment 1 app remains available locally. Install `requirements.txt` in a Python 3.12 virtual environment, run `python app.py`, and open `http://127.0.0.1:5000`. It uses the legacy SQLite database and the original server-rendered pages.
 
 ## Probability and Stake Calculations
 The Poisson model uses completed results from the project season strictly before the selected fixture. It requires at least three earlier home games for the home team and three earlier away games for the away team.
@@ -123,7 +90,7 @@ These are simple estimates from final scores, not measured xG. When history is i
 
 Bookmaker-implied probability is 1 / decimal odds. The value margin is model probability minus implied probability.
 
-Full Kelly is displayed for comparison. The suggested stake uses quarter Kelly, capped by available balance and the configured maximum stake. Actual stakes are entered by the user and validated separately.
+Full Kelly is displayed for comparison. The suggested stake uses quarter Kelly, capped by available balance and the split app's €10 maximum stake. Actual stakes are entered by the user and validated separately.
 
 Open stakes are deducted immediately. Winning bets receive a payout including the original stake, losing bets receive no credit, and void bets receive a refund. Already-settled bets cannot be settled again.
 

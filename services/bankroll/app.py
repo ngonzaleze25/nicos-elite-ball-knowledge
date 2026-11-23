@@ -6,6 +6,7 @@ from sys import float_info
 from flask import Flask,g,request
 from pymssql import Error
 
+from services.bankroll.bets import bets
 from services.bankroll.database import (
     check_database_health,
     connect_with_retry,
@@ -17,6 +18,7 @@ from services.bankroll.migrate import run_migrations
 
 def create_app():
     app = Flask(__name__)
+    app.register_blueprint(bets)
 
     connection = connect_with_retry()
     try:
