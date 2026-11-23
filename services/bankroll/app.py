@@ -1,6 +1,7 @@
 import os
 import time
 from contextlib import closing
+from sys import float_info
 
 from flask import Flask,g,request
 from pymssql import Error
@@ -10,6 +11,7 @@ from services.bankroll.database import (
     connect_with_retry,
     get_connection,
 )
+from services.bankroll.kelly import calculate_kelly_stake
 from services.bankroll.migrate import run_migrations
 
 
@@ -61,20 +63,47 @@ def create_app():
 
         return {"status": "ok", "db": "ok", "version": version}
 
+    def read_balance_cents():
+        with closing(get_connection()) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT COALESCE(SUM(CAST(amount_cents AS BIGINT)), 0)
+                    FROM dbo.bankroll_transactions;
+                """)
+                return cursor.fetchone()[0]
+
     @app.get("/balance")
     def balance():
         try:
-            with closing(get_connection()) as connection:
-                with connection.cursor() as cursor:
-                    cursor.execute("""
-                        SELECT COALESCE(SUM(CAST(amount_cents AS BIGINT)), 0)
-                        FROM dbo.bankroll_transactions;
-                    """)
-                    balance_cents = cursor.fetchone()[0]
+            return {"balance_cents": read_balance_cents()}
         except Error:
             return {"error": "Bankroll database unavailable"}, 503
 
-        return {"balance_cents": balance_cents}
+    @app.post("/kelly")
+    def suggest_stake():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "Send a JSON object."}, 400
+
+        odds = data.get("decimal_odds")
+        probability = data.get("probability")
+        if type(odds) not in (int, float) or not 1 < odds <= float_info.max:
+            return {"error": "Decimal odds must be finite and greater than 1."}, 400
+        if type(probability) not in (int, float) or not 0 <= probability <= 1:
+            return {"error": "Probability must be between 0 and 1."}, 400
+
+        try:
+            balance_cents = read_balance_cents()
+        except Error:
+            return {"error": "Bankroll database unavailable"}, 503
+
+        available_cents = max(0, balance_cents)
+        full_kelly = calculate_kelly_stake(available_cents, odds, probability)
+        return {
+            "balance_cents": balance_cents,
+            "full_kelly_cents": round(full_kelly),
+            "suggested_stake_cents": min(round(full_kelly * 0.25), available_cents, 1000),
+        }
 
     @app.post("/deposits")
     def add_deposit():

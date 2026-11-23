@@ -32,6 +32,17 @@
                     <button type="submit">Record deposit</button>
                 </form>
                 <p id="deposit-message" class="message" role="status"></p>
+                <h3>Kelly calculator</h3>
+                <form id="kelly-form">
+                    <label for="kelly-odds">Decimal odds</label>
+                    <input id="kelly-odds" name="odds" type="number"
+                           min="1.01" step="any" placeholder="2.00" required>
+                    <label for="kelly-probability">Estimated win probability (%)</label>
+                    <input id="kelly-probability" name="probability" type="number"
+                           min="0" max="100" step="any" placeholder="60" required>
+                    <button type="submit">Calculate stake</button>
+                </form>
+                <p id="kelly-result" class="message" role="status"></p>
             </section>
             <section class="panel" aria-labelledby="fixture-title">
                 <h2 id="fixture-title">LaLiga schedule</h2>
