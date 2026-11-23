@@ -58,6 +58,23 @@ docker compose up -d --build
 
 Open http://127.0.0.1:8080 and select **Sync LaLiga fixtures**. Journal uses the feed's fixture ID to update dates, statuses, and results on later syncs. Confirmed kickoffs display in the browser's local timezone. Unconfirmed times show **Kickoff TBC**. Previously imported fixtures remain available if the feed is temporarily down. Keep the token on the Journal service, with Azure deployment using a secret for `FOOTBALL_DATA_API_TOKEN`.
 
+### Assignment 2 CI checks
+
+The CI workflow validates the assignment system schema and both OpenAPI contracts, lints the service code, and enforces at least 70% coverage for each service. To run the Python checks from the repository root:
+
+```sh
+python -m pip install -r requirements-ci.txt
+ruff check services scripts tests/test_service_apis.py tests/test_service_migrations.py
+python scripts/validate_contracts.py
+python -m pytest --cov=services.bankroll --cov=services.journal \
+  tests/test_bankroll_startup.py tests/test_kelly.py tests/test_journal_fixture_feed.py \
+  tests/test_service_apis.py tests/test_service_migrations.py
+python -m coverage report --include='services/bankroll/*' --precision=2 --fail-under=70
+python -m coverage report --include='services/journal/*' --precision=2 --fail-under=70
+```
+
+CI also builds both images and starts a disposable Compose project with SQL Server. Its integration check writes a test deposit and fixture, stops Bankroll to verify that Journal still lists the fixture, and restarts Bankroll to verify recovery. CI uses synthetic fixture data and does not require Azure credentials or a football-data.org token.
+
 ## Using the Application
 
 1. Record your starting bankroll on Home.

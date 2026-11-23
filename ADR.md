@@ -61,3 +61,13 @@ Decision: Azure Storage hosts the static UI. Bankroll and Journal run in one Con
 Alternatives considered: I considered running both APIs on an always-on VM. I chose Container Apps Consumption because the APIs can scale to zero between requests. The databases use the serverless free offer, and static hosting costs depend on storage and traffic.
 
 Consequences: After idle time, a container may need to start and its database may need to resume, so the API retries the database connection with a delay. Each app is limited to one replica while migrations run at startup. At 100× traffic, I would check request latency and database usage, move migrations to a separate deployment step before allowing multiple replicas, and raise the database capacity if measurements show it is the bottleneck.
+
+## 9. Gate deployment on checks for both services
+
+Context: Each service can build successfully on its own while a broken API contract or a change to the call between services still breaks the application.
+
+Decision: Use GitHub Actions to lint, validate the system and OpenAPI documents, test the services, and enforce 70% line coverage separately for each service. Build both images and run the service seam test through Docker Compose with a temporary SQL Server.
+
+Alternatives considered: A stub makes timeout behavior easy to reproduce in a unit test, but it cannot show whether Compose networking, SQL permissions, and both containers work together. Keep a fast unit test and a separate Compose test that stops and restarts Bankroll.
+
+Consequences: CI uses a synthetic fixture and a test deposit. It verifies that Journal keeps showing the fixture while Bankroll is unavailable and that the balance is restored after Bankroll restarts. CI does not call football-data.org or Azure SQL. Azure behavior is checked after deployment.

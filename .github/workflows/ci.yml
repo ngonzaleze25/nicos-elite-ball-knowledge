@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test services and validate contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      COMPOSE_PROJECT_NAME: betledger-ci
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-ci.txt
+            services/*/requirements.txt
+      - name: Install service and CI dependencies
+        run: python -m pip install -r requirements-ci.txt
+      - name: Lint and validate contracts
+        run: |
+          ruff check services scripts tests/test_service_apis.py tests/test_service_migrations.py
+          python scripts/validate_contracts.py
+      - name: Unit tests and coverage per service
+        run: |
+          python -m pytest --cov=services.bankroll --cov=services.journal --cov-report=term-missing \
+            tests/test_bankroll_startup.py tests/test_kelly.py tests/test_journal_fixture_feed.py \
+            tests/test_service_apis.py tests/test_service_migrations.py
+          python -m coverage report --include='services/bankroll/*' --precision=2 --fail-under=70
+          python -m coverage report --include='services/journal/*' --precision=2 --fail-under=70
+      - name: Build images and verify the service seam against SQL Server
+        run: |
+          export MSSQL_SA_PASSWORD="Aa9$(openssl rand -hex 16)"
+          export BANKROLL_DB_PASSWORD="Aa9$(openssl rand -hex 16)"
+          export JOURNAL_DB_PASSWORD="Aa9$(openssl rand -hex 16)"
+          printf '::add-mask::%s\n' "$MSSQL_SA_PASSWORD" "$BANKROLL_DB_PASSWORD" "$JOURNAL_DB_PASSWORD"
+          trap 'docker compose down --volumes' EXIT
+          docker compose up -d --build
+          python scripts/smoke_compose.py
+        env:
+          FOOTBALL_DATA_API_TOKEN: ''
